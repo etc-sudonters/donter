@@ -1,0 +1,65 @@
+site:
+  # --serve overrides some of these
+  baseUrl: etc.sudonters.com
+  https: force
+  template:
+    path: template
+
+content:
+  pages:
+    path: content/articles
+    perserveStructureOnOutput: true
+  include:
+    - path: content/static
+      as: .static/
+  exclude:
+    - content/static/.dumpster
+
+output:
+  localization:
+    datePattern: "%Y-%m-%d"
+    timezone: America/New_York
+  # slug: some-article-name -> localhost:1312/some-article-name/index.html
+  # otherwise: some-article-name.html
+  writeAsDirectories: true
+  formats:
+    pages: "pages/{slug}"
+    tags: "tags/{slug}"
+    series: "series/{slug}"
+
+  # donter generate -o files -o s3
+  target:
+  files:
+    path: path/to/write
+    # creates a .tar.gz at path
+    archive: true
+
+  s3:
+    bucket: arn
+    emptyBucket: true
+    flushCloudfrontCache: arn
+
+  # donter generate --serve
+  # excludes files and s3
+  serve:
+    listen: localhost:1312
+    writeFiles: false
+    reload: true
+    # everything in content is automatically included in watches
+    alsoWatch:
+      - path/not/in/content/for/some/reason
+
+transformers:
+  configuration:
+    - name: indexer
+      with:
+        date-grouping: "%Y-%m"
+        date-sorting: "desc" # most recent first
+        tag-ordering: "alphabetical"
+        tag-sorting: "asc"
+  # explicit allowlist, unless "*" | "default" | null
+  use: default
+  # ones packaged as "plugins" but
+  include:
+    - atom
+    - rss
