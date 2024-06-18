@@ -1,6 +1,5 @@
 use crate::{content, doctree, files, Res};
-
-use std::path::PathBuf;
+use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 pub fn default() -> Corpus {
     Default::default()
@@ -30,6 +29,8 @@ impl Default for Corpus {
 pub struct PageBuilder {
     content: Option<doctree::Document>,
     filepath: Option<files::FilePath>,
+    notes: Option<References>,
+    links_and_images: Option<References>,
 }
 
 impl PageBuilder {
@@ -37,6 +38,8 @@ impl PageBuilder {
         PageBuilder {
             content: None,
             filepath: None,
+            notes: None,
+            links_and_images: None,
         }
     }
 
@@ -50,8 +53,14 @@ impl PageBuilder {
         self
     }
 
-    // would be nicer if this was mut self instead :|
-    // could probably do some type level shit to do that but :shrug:
+    pub fn footnotes(&mut self) -> &mut References {
+        self.notes.get_or_insert_with(Default::default)
+    }
+
+    pub fn links(&mut self) -> &mut References {
+        self.links_and_images.get_or_insert_with(Default::default)
+    }
+
     pub fn build(&mut self) -> Option<Page> {
         if self.content.is_none() || self.filepath.is_none() {
             None
@@ -62,6 +71,8 @@ impl PageBuilder {
                 },
                 content: PageContents {
                     content: self.content.take().unwrap(),
+                    footnotes: self.notes.take(),
+                    links_and_images: self.links_and_images.take(),
                 },
             })
         }
@@ -70,6 +81,8 @@ impl PageBuilder {
     pub fn clear(&mut self) {
         self.content.take();
         self.filepath.take();
+        self.notes.take();
+        self.links_and_images.take();
     }
 }
 
@@ -87,6 +100,46 @@ pub struct PageMetadata {
 #[derive(Debug)]
 pub struct PageContents {
     content: doctree::Document,
+    footnotes: Option<References>,
+    links_and_images: Option<References>,
+}
+
+#[derive(Debug)]
+pub struct References {
+    references: Vec<String>,
+    definitions: HashMap<usize, doctree::Document>,
+}
+
+impl Default for References {
+    fn default() -> Self {
+        References {
+            references: Vec::new(),
+            definitions: HashMap::new(),
+        }
+    }
+}
+
+impl References {
+    pub fn add_reference(&mut self, key: &String) {
+        self.get_or_insert(key);
+    }
+
+    fn get_or_insert(&mut self, key: &String) -> usize {
+        match self.references.iter().position(|r| key == r) {
+            Some(id) => id,
+            None => {
+                let id = self.references.len();
+                self.references.push(key.to_owned());
+                id
+            }
+        }
+    }
+
+    pub fn define(&mut self, key: &String, value: doctree::Document) {
+        let id = self.get_or_insert(key);
+        let entry = self.definitions.entry(id);
+        entry.or_insert(value);
+    }
 }
 
 #[derive(Debug)]
@@ -100,4 +153,14 @@ pub trait Loader {
         corpus: &mut crate::content::Corpus,
         builder: &mut content::PageBuilder,
     ) -> crate::Res<()>;
+}
+
+#[derive(Debug)]
+pub enum Error {}
+impl std::error::Error for Error {}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }

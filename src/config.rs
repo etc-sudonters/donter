@@ -8,10 +8,12 @@ pub struct Configuration {
     site_: Site,
 }
 
-pub fn load(_args: env::Args) -> Res<Configuration> {
+pub fn load(args: env::Args) -> Res<Configuration> {
+    let content_base = args.into_iter().nth(1).expect("content path is required");
+
     Ok(Configuration {
         content_: Content {
-            base: unsafe { DirPath::new("/mnt/anr/newlondo/source/blog/content/articles") },
+            base: unsafe { DirPath::new(content_base) },
         },
         site_: Site {},
     })
