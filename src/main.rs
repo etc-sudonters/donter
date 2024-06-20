@@ -5,7 +5,7 @@ mod doctree;
 mod files;
 mod jinja;
 mod linker;
-mod loaders;
+mod md;
 mod output;
 mod processors;
 mod site;
@@ -19,7 +19,7 @@ fn main() -> Res<()> {
 
     let mut conf = config::load(env::args())?;
     let mut corpus = content::default();
-    let mut loaders = loaders::default();
+    let mut loaders = md::default();
 
     let mut page_builder = content::PageBuilder::new();
 

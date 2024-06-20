@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 #[derive(Debug)]
 pub struct Document {
     content: Vec<Element>,
@@ -39,23 +41,23 @@ impl From<Element> for Document {
 pub enum Element {
     Group(Group),
     //
-    BlockQuote,
+    BlockQuote(Group),
     Break,
-    Code(CodeBlock),
-    Emphasis,
-    FootnoteDefinition,
-    FootnoteReference,
-    Heading,
-    Image,
-    ImageReference,
-    InlineCode,
-    Link,
-    LinkDefinition,
-    LinkReference,
-    Paragraph,
-    Strong,
-    Table,
-    Text,
+    Code(Code),
+    Emphasis(Group),
+    FootnoteDefinition(FootnoteDefinition),
+    FootnoteReference(FootnoteReference),
+    Heading(Header),
+    Image(Image),
+    ImageReference(HrefReference),
+    InlineCode(Code),
+    Link(Link),
+    HrefDefinition(HrefDefinition),
+    HrefReference(HrefReference),
+    Paragraph(Group),
+    Strong(Group),
+    Table(Table),
+    Text(Text),
     ThematicBreak,
 }
 
@@ -83,16 +85,16 @@ impl From<String> for CodeLanguage {
 }
 
 #[derive(Debug)]
-pub struct CodeBlock {
+pub struct Code {
     code: CodeLiteral,
     lang: Option<CodeLanguage>,
     // freeform string -- it's not of use here but transformers may want it
     meta: Option<String>,
 }
 
-impl CodeBlock {
-    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>, meta: Option<String>) -> CodeBlock {
-        CodeBlock { code, lang, meta }
+impl Code {
+    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>, meta: Option<String>) -> Code {
+        Code { code, lang, meta }
     }
 }
 
@@ -106,8 +108,155 @@ impl FromIterator<Element> for Group {
 
 impl From<Element> for Group {
     fn from(value: Element) -> Self {
-        Group {
-            children: vec![value],
+        match value {
+            Element::Group(g) => g,
+            v @ _ => Group { children: vec![v] },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Header {
+    depth: u8,
+    children: Box<Element>,
+}
+
+impl Header {
+    pub fn create(depth: u8, children: Element) -> Self {
+        Header {
+            depth,
+            children: Box::new(children),
+        }
+    }
+}
+
+pub struct Text(String);
+
+impl Text {
+    pub fn create(s: String) -> Text {
+        Text(s)
+    }
+}
+
+impl Debug for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Text(...)")
+    }
+}
+
+#[derive(Debug)]
+pub struct Link {
+    href: String,
+    content: Box<Element>,
+    title: Option<String>,
+}
+
+impl Link {
+    pub fn create(href: String, content: Element, title: Option<String>) -> Self {
+        Self {
+            href,
+            content: Box::new(content),
+            title,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct HrefDefinition {
+    id: String,
+    href: String,
+}
+
+impl HrefDefinition {
+    pub fn create(id: String, href: String) -> Self {
+        Self { id, href }
+    }
+}
+
+#[derive(Debug)]
+pub struct HrefReference {
+    content: Box<Element>,
+    id: String,
+    title: Option<String>,
+}
+
+impl HrefReference {
+    pub fn create(id: String, content: Element, title: Option<String>) -> Self {
+        Self {
+            content: Box::new(content),
+            id,
+            title,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Image {
+    alt: String,
+    href: String,
+}
+
+impl Image {
+    pub fn create(href: String, alt: String) -> Self {
+        Self { alt, href }
+    }
+}
+
+#[derive(Debug)]
+pub struct TableRow {
+    cells: Vec<TableCell>,
+}
+
+impl FromIterator<TableCell> for TableRow {
+    fn from_iter<T: IntoIterator<Item = TableCell>>(iter: T) -> Self {
+        Self {
+            cells: iter.into_iter().collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TableCell(Box<Element>);
+
+impl TableCell {
+    pub fn create(elm: Element) -> Self {
+        Self(Box::new(elm))
+    }
+}
+
+#[derive(Debug)]
+pub struct Table {
+    rows: Vec<TableRow>,
+}
+
+impl FromIterator<TableRow> for Table {
+    fn from_iter<T: IntoIterator<Item = TableRow>>(iter: T) -> Self {
+        Self {
+            rows: iter.into_iter().collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FootnoteReference(String);
+
+impl FootnoteReference {
+    pub fn create(id: String) -> Self {
+        Self(id)
+    }
+}
+
+#[derive(Debug)]
+pub struct FootnoteDefinition {
+    id: String,
+    content: Box<Element>,
+}
+
+impl FootnoteDefinition {
+    pub fn create(id: String, content: Element) -> Self {
+        Self {
+            id,
+            content: Box::new(content),
         }
     }
 }
