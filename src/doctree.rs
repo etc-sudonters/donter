@@ -3,11 +3,39 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub struct Document {
     content: Vec<Element>,
+    footnotes: Vec<FootnoteDefinition>,
+    hrefs: Vec<HrefDefinition>,
 }
 
 impl Default for Document {
     fn default() -> Self {
-        Document { content: vec![] }
+        Document {
+            content: vec![],
+            footnotes: vec![],
+            hrefs: vec![],
+        }
+    }
+}
+
+impl FromIterator<DocumentPart> for Document {
+    fn from_iter<T: IntoIterator<Item = DocumentPart>>(iter: T) -> Self {
+        let mut doc = Document::default();
+
+        for part in iter.into_iter() {
+            match part {
+                DocumentPart::Element(elm) => {
+                    doc.content.push(elm);
+                }
+                DocumentPart::Href(href) => {
+                    doc.hrefs.push(href);
+                }
+                DocumentPart::Footnote(ftn) => {
+                    doc.footnotes.push(ftn);
+                }
+            }
+        }
+
+        doc
     }
 }
 
@@ -22,7 +50,14 @@ impl FromIterator<Element> for Document {
                     _ => vec![elm],
                 })
                 .collect(),
+            ..Default::default()
         }
+    }
+}
+
+impl From<DocumentPart> for Document {
+    fn from(value: DocumentPart) -> Self {
+        Document::from_iter(vec![value])
     }
 }
 
@@ -33,7 +68,32 @@ impl From<Element> for Document {
                 Element::Group(r) => r.children,
                 _ => vec![value],
             },
+            ..Default::default()
         }
+    }
+}
+
+pub enum DocumentPart {
+    Element(Element),
+    Footnote(FootnoteDefinition),
+    Href(HrefDefinition),
+}
+
+impl From<Element> for DocumentPart {
+    fn from(value: Element) -> Self {
+        DocumentPart::Element(value)
+    }
+}
+
+impl From<FootnoteDefinition> for DocumentPart {
+    fn from(value: FootnoteDefinition) -> Self {
+        DocumentPart::Footnote(value)
+    }
+}
+
+impl From<HrefDefinition> for DocumentPart {
+    fn from(value: HrefDefinition) -> Self {
+        DocumentPart::Href(value)
     }
 }
 
@@ -45,14 +105,12 @@ pub enum Element {
     Break,
     Code(Code),
     Emphasis(Group),
-    FootnoteDefinition(FootnoteDefinition),
     FootnoteReference(FootnoteReference),
     Heading(Header),
     Image(Image),
     ImageReference(HrefReference),
     InlineCode(Code),
     Link(Link),
-    HrefDefinition(HrefDefinition),
     HrefReference(HrefReference),
     Paragraph(Group),
     Strong(Group),
@@ -260,3 +318,8 @@ impl FootnoteDefinition {
         }
     }
 }
+
+// marker to use as trait bound
+pub trait Definition {}
+impl Definition for FootnoteDefinition {}
+impl Definition for HrefDefinition {}

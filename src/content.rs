@@ -29,8 +29,8 @@ impl Default for Corpus {
 pub struct PageBuilder {
     content: Option<doctree::Document>,
     filepath: Option<files::FilePath>,
-    notes: Option<References>,
-    links_and_images: Option<References>,
+    notes: Option<Definitions<doctree::FootnoteDefinition>>,
+    links_and_images: Option<Definitions<doctree::HrefDefinition>>,
 }
 
 impl PageBuilder {
@@ -53,11 +53,11 @@ impl PageBuilder {
         self
     }
 
-    pub fn footnotes(&mut self) -> &mut References {
+    pub fn footnotes(&mut self) -> &mut Definitions<doctree::FootnoteDefinition> {
         self.notes.get_or_insert_with(Default::default)
     }
 
-    pub fn links(&mut self) -> &mut References {
+    pub fn links(&mut self) -> &mut Definitions<doctree::HrefDefinition> {
         self.links_and_images.get_or_insert_with(Default::default)
     }
 
@@ -100,45 +100,46 @@ pub struct PageMetadata {
 #[derive(Debug)]
 pub struct PageContents {
     content: doctree::Document,
-    footnotes: Option<References>,
-    links_and_images: Option<References>,
+    footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
+    links_and_images: Option<Definitions<doctree::HrefDefinition>>,
 }
 
 #[derive(Debug)]
-pub struct References {
-    references: Vec<String>,
-    definitions: HashMap<usize, doctree::Document>,
+pub struct Definitions<T: doctree::Definition> {
+    labels: Vec<String>,
+    // label idx -> definition
+    definitions: HashMap<usize, T>,
 }
 
-impl Default for References {
+impl<T: doctree::Definition> Default for Definitions<T> {
     fn default() -> Self {
-        References {
-            references: Vec::new(),
+        Definitions {
+            labels: Vec::new(),
             definitions: HashMap::new(),
         }
     }
 }
 
-impl References {
-    pub fn add_reference(&mut self, key: &String) {
+impl<T: doctree::Definition> Definitions<T> {
+    pub fn add_label(&mut self, key: &String) {
         self.get_or_insert(key);
     }
 
-    fn get_or_insert(&mut self, key: &String) -> usize {
-        match self.references.iter().position(|r| key == r) {
-            Some(id) => id,
-            None => {
-                let id = self.references.len();
-                self.references.push(key.to_owned());
-                id
-            }
-        }
-    }
-
-    pub fn define(&mut self, key: &String, value: doctree::Document) {
+    pub fn define(&mut self, key: &String, value: T) {
         let id = self.get_or_insert(key);
         let entry = self.definitions.entry(id);
         entry.or_insert(value);
+    }
+
+    fn get_or_insert(&mut self, key: &String) -> usize {
+        match self.labels.iter().position(|r| key == r) {
+            Some(id) => id,
+            None => {
+                let id = self.labels.len();
+                self.labels.push(key.to_owned());
+                id
+            }
+        }
     }
 }
 

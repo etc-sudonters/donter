@@ -1,6 +1,19 @@
 use crate::doctree::{self, HrefReference, Text};
 use std::fmt::Display;
 
+impl TryFrom<&markdown::mdast::Node> for doctree::DocumentPart {
+    type Error = ParseError;
+
+    fn try_from(value: &markdown::mdast::Node) -> Result<Self, Self::Error> {
+        use markdown::mdast::Node;
+        match value {
+            Node::FootnoteDefinition(ftn) => Ok(doctree::DocumentPart::Footnote(ftn.try_into()?)),
+            Node::Definition(def) => Ok(doctree::DocumentPart::Href(def.into())),
+            node @ _ => Ok(doctree::DocumentPart::Element(node.try_into()?)),
+        }
+    }
+}
+
 impl TryFrom<&markdown::mdast::Node> for doctree::Element {
     type Error = ParseError;
 
@@ -14,13 +27,11 @@ impl TryFrom<&markdown::mdast::Node> for doctree::Element {
             Node::Break(_) => Ok(Element::Break),
             Node::Emphasis(e) => Ok(Element::Emphasis(doctree::Group::try_from(&e.children)?)),
             Node::FootnoteReference(r) => Ok(Element::FootnoteReference(r.into())),
-            Node::FootnoteDefinition(d) => Ok(Element::FootnoteDefinition(d.try_into()?)),
             Node::Heading(h) => Ok(Element::Heading(doctree::Header::try_from(h)?)),
             Node::Image(i) => Ok(Element::Image(doctree::Image::from(i))),
             Node::ImageReference(r) => Ok(Element::ImageReference(doctree::HrefReference::from(r))),
             Node::InlineCode(code) => Ok(Element::InlineCode(code.into())),
             Node::Link(l) => Ok(Element::Link(doctree::Link::try_from(l)?)),
-            Node::Definition(d) => Ok(Element::HrefDefinition(d.into())),
             Node::LinkReference(r) => {
                 Ok(Element::HrefReference(doctree::HrefReference::try_from(r)?))
             }
@@ -29,13 +40,15 @@ impl TryFrom<&markdown::mdast::Node> for doctree::Element {
             Node::Table(tbl) => Ok(Element::Table(doctree::Table::try_from(tbl)?)),
             Node::Text(t) => Ok(Element::Text(t.into())),
             Node::ThematicBreak(_) => Ok(Element::ThematicBreak),
+            // just don't nest them :shrug:
+            Node::Definition(_) | Node::FootnoteDefinition(_) => Err(ParseError),
             _ => Err(ParseError),
         }
     }
 }
 
 pub struct ParseError;
-pub type ParseResult = Result<doctree::Element, ParseError>;
+pub type ParseResult = Result<doctree::DocumentPart, ParseError>;
 
 impl Display for ParseError {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

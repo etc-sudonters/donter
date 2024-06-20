@@ -6,7 +6,7 @@ use super::translate::{ParseError, ParseResult};
 
 fn try_parse<'a, S: AsRef<str>>(s: S) -> ParseResult {
     match markdown::to_mdast(s.as_ref(), &Default::default()) {
-        Ok(mdast) => doctree::Element::try_from(&mdast),
+        Ok(mdast) => doctree::DocumentPart::try_from(&mdast),
         _ => Err(ParseError),
     }
 }
