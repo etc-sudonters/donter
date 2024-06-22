@@ -64,7 +64,7 @@ impl PageBuilder {
     // returns the built page, or the builder and a description of the error
     pub fn try_build(mut self) -> crate::Result<Page> {
         if self.content.is_none() || self.filepath.is_none() {
-            Err(Box::new(Error::PageLoad))
+            Err(Box::new(Error::IncompleteLoader))
         } else {
             Ok(Page {
                 meta: PageMetadata {
@@ -176,7 +176,8 @@ pub trait Loader {
 
 #[derive(Debug)]
 pub enum Error {
-    PageLoad,
+    PageLoad(files::FilePath, Box<dyn std::error::Error>),
+    IncompleteLoader,
 }
 impl std::error::Error for Error {}
 

@@ -1,5 +1,3 @@
-use markdown::mdast::ListItem;
-
 use crate::doctree::{self, HrefReference, Text};
 use std::fmt::{Debug, Display};
 

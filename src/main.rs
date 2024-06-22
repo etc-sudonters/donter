@@ -28,7 +28,8 @@ fn main() -> Result<()> {
                     Box::new(std::fs::File::open(&path)?),
                     &mut corpus,
                     content::PageBuilder::new().path(&path),
-                );
+                )
+                .map_err(|e| content::Error::PageLoad(path.clone(), e))?;
             }
         }
     }
