@@ -34,7 +34,7 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("{:?}", corpus);
+    println!("{:#?}", corpus);
 
     Ok(())
 }
