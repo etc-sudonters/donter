@@ -118,6 +118,7 @@ impl From<HrefDefinition> for DocumentPart {
 #[derive(Debug)]
 pub enum Element {
     Group(Group),
+    Empty,
     //
     BlockQuote(Group),
     Break,
@@ -237,6 +238,16 @@ impl From<Element> for Group {
         match value {
             Element::Group(g) => g,
             v @ _ => Group { children: vec![v] },
+        }
+    }
+}
+
+impl From<Group> for Element {
+    fn from(mut value: Group) -> Self {
+        match value.children.len() {
+            0 => Element::Empty,
+            1 => value.children.remove(0),
+            _ => Element::Group(value),
         }
     }
 }

@@ -21,7 +21,7 @@ impl TryFrom<&markdown::mdast::Node> for doctree::Element {
         use doctree::Element;
         use markdown::mdast::Node;
         match value {
-            Node::Root(r) => Ok(Element::Group(doctree::Group::try_from(&r.children)?)),
+            Node::Root(r) => Ok((doctree::Group::try_from(&r.children)?).into()),
             Node::Code(code) => Ok(Element::CodeBlock(code.try_into()?)),
             Node::BlockQuote(r) => Ok(Element::BlockQuote(doctree::Group::try_from(&r.children)?)),
             Node::Break(_) => Ok(Element::Break),
@@ -118,7 +118,7 @@ impl TryFrom<&markdown::mdast::Heading> for doctree::Header {
     fn try_from(value: &markdown::mdast::Heading) -> Result<Self, Self::Error> {
         Ok(doctree::Header::create(
             value.depth,
-            doctree::Element::Group(doctree::Group::try_from(&value.children)?),
+            (doctree::Group::try_from(&value.children)?).into(),
         ))
     }
 }
@@ -135,7 +135,7 @@ impl TryFrom<&markdown::mdast::Link> for doctree::Link {
     fn try_from(value: &markdown::mdast::Link) -> Result<Self, Self::Error> {
         Ok(doctree::Link::create(
             value.url.clone(),
-            doctree::Element::Group(doctree::Group::try_from(&value.children)?),
+            (doctree::Group::try_from(&value.children)?).into(),
             value.title.clone(),
         ))
     }
@@ -153,7 +153,7 @@ impl TryFrom<&markdown::mdast::LinkReference> for doctree::HrefReference {
     fn try_from(value: &markdown::mdast::LinkReference) -> Result<Self, Self::Error> {
         Ok(Self::create(
             value.identifier.clone(),
-            doctree::Element::Group(doctree::Group::try_from(&value.children)?),
+            (doctree::Group::try_from(&value.children)?).into(),
             value.label.clone(),
         ))
     }
@@ -215,9 +215,9 @@ impl TryFrom<&markdown::mdast::TableCell> for doctree::TableCell {
     type Error = ParseError;
 
     fn try_from(value: &markdown::mdast::TableCell) -> Result<Self, Self::Error> {
-        Ok(doctree::TableCell::create(doctree::Element::Group(
-            doctree::Group::try_from(&value.children)?,
-        )))
+        Ok(doctree::TableCell::create(
+            (doctree::Group::try_from(&value.children)?).into(),
+        ))
     }
 }
 
@@ -232,7 +232,7 @@ impl TryFrom<&markdown::mdast::FootnoteDefinition> for doctree::FootnoteDefiniti
     fn try_from(value: &markdown::mdast::FootnoteDefinition) -> Result<Self, Self::Error> {
         Ok(Self::create(
             value.identifier.clone(),
-            doctree::Element::Group(doctree::Group::try_from(&value.children)?),
+            (doctree::Group::try_from(&value.children)?).into(),
         ))
     }
 }
