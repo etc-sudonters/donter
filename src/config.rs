@@ -1,5 +1,5 @@
 use crate::files::DirPath;
-use crate::Res;
+use crate::Result;
 use std::env;
 
 #[derive(Clone, Debug)]
@@ -8,7 +8,7 @@ pub struct Configuration {
     site_: Site,
 }
 
-pub fn load(args: env::Args) -> Res<Configuration> {
+pub fn load(args: env::Args) -> Result<Configuration> {
     let content_base = args.into_iter().nth(1).expect("content path is required");
 
     Ok(Configuration {

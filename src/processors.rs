@@ -7,7 +7,7 @@ impl TimeToRead {
     }
 }
 impl site::Preprocessor for TimeToRead {
-    fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Res<()> {
+    fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Result<()> {
         todo!()
     }
 }
@@ -19,13 +19,13 @@ impl ReferenceOrganization {
     }
 }
 impl site::Preprocessor for ReferenceOrganization {
-    fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Res<()> {
+    fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Result<()> {
         todo!()
     }
 }
 
 pub mod index {
-    use crate::{content, site, Res};
+    use crate::{content, site, Result};
 
     #[derive(Default)]
     pub struct Tag {}
@@ -53,31 +53,31 @@ pub mod index {
     }
 
     impl Indexer for Tag {
-        fn index(&mut self, corpus: &mut content::Corpus) -> Res<()> {
+        fn index(&mut self, corpus: &mut content::Corpus) -> Result<()> {
             todo!()
         }
     }
 
     impl Indexer for Date {
-        fn index(&mut self, corpus: &mut content::Corpus) -> Res<()> {
+        fn index(&mut self, corpus: &mut content::Corpus) -> Result<()> {
             todo!()
         }
     }
     impl Indexer for Series {
-        fn index(&mut self, corpus: &mut content::Corpus) -> Res<()> {
+        fn index(&mut self, corpus: &mut content::Corpus) -> Result<()> {
             todo!()
         }
     }
 
     pub trait Indexer {
-        fn index(&mut self, corpus: &mut content::Corpus) -> Res<()>;
+        fn index(&mut self, corpus: &mut content::Corpus) -> Result<()>;
     }
 
     impl<T> site::Postprocessor for T
     where
         T: Indexer,
     {
-        fn run(&mut self, corpus: &mut content::Corpus) -> Res<()> {
+        fn run(&mut self, corpus: &mut content::Corpus) -> Result<()> {
             self.index(corpus)
         }
     }
@@ -94,7 +94,7 @@ pub mod feed {
     }
 
     impl Processor for Atom {
-        fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Res<()> {
+        fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Result<()> {
             todo!()
         }
     }
@@ -107,7 +107,7 @@ pub mod feed {
     }
 
     impl Processor for Rss {
-        fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Res<()> {
+        fn run(&mut self, corpus: &mut crate::content::Corpus) -> crate::Result<()> {
             todo!()
         }
     }

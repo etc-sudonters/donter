@@ -1,4 +1,4 @@
-use crate::{content, doctree, files, Res};
+use crate::{content, doctree, files, Result};
 use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 pub fn default() -> Corpus {
@@ -27,10 +27,10 @@ impl Default for Corpus {
 }
 
 pub struct PageBuilder {
-    content: Option<doctree::Document>,
+    content: Option<doctree::Element>,
     filepath: Option<files::FilePath>,
     notes: Option<Definitions<doctree::FootnoteDefinition>>,
-    links_and_images: Option<Definitions<doctree::HrefDefinition>>,
+    hrefs: Option<Definitions<doctree::HrefDefinition>>,
 }
 
 impl PageBuilder {
@@ -39,17 +39,17 @@ impl PageBuilder {
             content: None,
             filepath: None,
             notes: None,
-            links_and_images: None,
+            hrefs: None,
         }
     }
 
-    pub fn contents(&mut self, content: doctree::Document) -> &mut Self {
+    pub fn contents(mut self, content: doctree::Element) -> Self {
         self.content = Some(content);
         self
     }
 
-    pub fn path(&mut self, f: files::FilePath) -> &mut Self {
-        self.filepath = Some(f);
+    pub fn path(mut self, f: &files::FilePath) -> Self {
+        self.filepath = Some(f.to_owned());
         self
     }
 
@@ -57,32 +57,29 @@ impl PageBuilder {
         self.notes.get_or_insert_with(Default::default)
     }
 
-    pub fn links(&mut self) -> &mut Definitions<doctree::HrefDefinition> {
-        self.links_and_images.get_or_insert_with(Default::default)
+    pub fn hrefs(&mut self) -> &mut Definitions<doctree::HrefDefinition> {
+        self.hrefs.get_or_insert_with(Default::default)
     }
 
-    pub fn build(&mut self) -> Option<Page> {
+    // returns the built page, or the builder and a description of the error
+    pub fn try_build(mut self) -> crate::Result<Page> {
         if self.content.is_none() || self.filepath.is_none() {
-            None
+            Err(Box::new(Error::PageLoad))
         } else {
-            Some(Page {
+            Ok(Page {
                 meta: PageMetadata {
                     path: self.filepath.take().unwrap(),
+                    tags: vec![],
+                    when: Date("".to_owned()),
+                    status: PageStatus::Draft,
                 },
                 content: PageContents {
                     content: self.content.take().unwrap(),
                     footnotes: self.notes.take(),
-                    links_and_images: self.links_and_images.take(),
+                    hrefs: self.hrefs.take(),
                 },
             })
         }
-    }
-
-    pub fn clear(&mut self) {
-        self.content.take();
-        self.filepath.take();
-        self.notes.take();
-        self.links_and_images.take();
     }
 }
 
@@ -95,13 +92,28 @@ pub struct Page {
 #[derive(Debug)]
 pub struct PageMetadata {
     path: files::FilePath,
+    tags: Vec<Tag>,
+    when: Date,
+    status: PageStatus,
+}
+
+#[derive(Debug)]
+pub struct Tag(String);
+
+#[derive(Debug)]
+pub struct Date(String);
+
+#[derive(Debug)]
+pub enum PageStatus {
+    Published,
+    Draft,
 }
 
 #[derive(Debug)]
 pub struct PageContents {
-    content: doctree::Document,
+    content: doctree::Element,
     footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
-    links_and_images: Option<Definitions<doctree::HrefDefinition>>,
+    hrefs: Option<Definitions<doctree::HrefDefinition>>,
 }
 
 #[derive(Debug)]
@@ -121,6 +133,12 @@ impl<T: doctree::Definition> Default for Definitions<T> {
 }
 
 impl<T: doctree::Definition> Definitions<T> {
+    pub fn gather(&mut self, definitions: Vec<T>) {
+        for definition in definitions.into_iter() {
+            self.define(&definition.label(), definition);
+        }
+    }
+
     pub fn add_label(&mut self, key: &String) {
         self.get_or_insert(key);
     }
@@ -147,17 +165,19 @@ impl<T: doctree::Definition> Definitions<T> {
 pub struct IncludedPath(PathBuf);
 
 pub trait Loader {
-    fn accept(&mut self, path: &files::FilePath) -> Res<bool>;
+    fn accept(&mut self, path: &files::FilePath) -> Result<bool>;
     fn load(
         &mut self,
-        path: &files::FilePath,
+        content: Box<dyn std::io::Read>,
         corpus: &mut crate::content::Corpus,
-        builder: &mut content::PageBuilder,
-    ) -> crate::Res<()>;
+        builder: content::PageBuilder,
+    ) -> crate::Result<()>;
 }
 
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+    PageLoad,
+}
 impl std::error::Error for Error {}
 
 impl Display for Error {

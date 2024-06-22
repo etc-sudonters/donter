@@ -1,5 +1,7 @@
+use markdown::mdast::ListItem;
+
 use crate::doctree::{self, HrefReference, Text};
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 impl TryFrom<&markdown::mdast::Node> for doctree::DocumentPart {
     type Error = ParseError;
@@ -22,7 +24,7 @@ impl TryFrom<&markdown::mdast::Node> for doctree::Element {
         use markdown::mdast::Node;
         match value {
             Node::Root(r) => Ok(Element::Group(doctree::Group::try_from(&r.children)?)),
-            Node::Code(code) => Ok(Element::Code(code.try_into()?)),
+            Node::Code(code) => Ok(Element::CodeBlock(code.try_into()?)),
             Node::BlockQuote(r) => Ok(Element::BlockQuote(doctree::Group::try_from(&r.children)?)),
             Node::Break(_) => Ok(Element::Break),
             Node::Emphasis(e) => Ok(Element::Emphasis(doctree::Group::try_from(&e.children)?)),
@@ -40,21 +42,39 @@ impl TryFrom<&markdown::mdast::Node> for doctree::Element {
             Node::Table(tbl) => Ok(Element::Table(doctree::Table::try_from(tbl)?)),
             Node::Text(t) => Ok(Element::Text(t.into())),
             Node::ThematicBreak(_) => Ok(Element::ThematicBreak),
+            Node::List(list) => Ok(Element::List(list.try_into()?)),
             // just don't nest them :shrug:
-            Node::Definition(_) | Node::FootnoteDefinition(_) => Err(ParseError),
-            _ => Err(ParseError),
+            Node::Definition(_) | Node::FootnoteDefinition(_) => {
+                Err(ParseError::Unsupported("Definition".to_owned()))
+            }
+            any @ _ => Err(ParseError::Unknown(format!("{:?}", any))),
         }
     }
 }
 
-pub struct ParseError;
+pub enum ParseError {
+    Unsupported(String),
+    Unknown(String),
+}
 pub type ParseResult = Result<doctree::DocumentPart, ParseError>;
 
 impl Display for ParseError {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ParseError::")?;
+        match self {
+            Self::Unknown(msg) => write!(f, "Unknown({})", &msg),
+            Self::Unsupported(what) => write!(f, "Unsupported({})", &what),
+        }
     }
 }
+
+impl Debug for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as Display>::fmt(self, f)
+    }
+}
+
+impl std::error::Error for ParseError {}
 
 impl TryFrom<Vec<markdown::mdast::Node>> for doctree::Group {
     type Error = ParseError;
@@ -166,7 +186,7 @@ impl TryFrom<&markdown::mdast::Table> for doctree::Table {
         for node in value.children.iter() {
             match node {
                 markdown::mdast::Node::TableRow(row) => rows.push(row.try_into()?),
-                _ => return Err(ParseError),
+                _ => return Err(ParseError::Unsupported("Not table row".to_owned())),
             }
         }
 
@@ -185,7 +205,7 @@ impl TryFrom<&markdown::mdast::TableRow> for doctree::TableRow {
                 markdown::mdast::Node::TableCell(cell) => {
                     cells.push(cell.try_into()?);
                 }
-                _ => return Err(ParseError),
+                _ => return Err(ParseError::Unsupported("Not Table Cell".to_owned())),
             }
         }
 
@@ -216,5 +236,31 @@ impl TryFrom<&markdown::mdast::FootnoteDefinition> for doctree::FootnoteDefiniti
             value.identifier.clone(),
             doctree::Element::Group(doctree::Group::try_from(&value.children)?),
         ))
+    }
+}
+
+impl TryFrom<&markdown::mdast::List> for doctree::List {
+    type Error = ParseError;
+    fn try_from(value: &markdown::mdast::List) -> Result<Self, Self::Error> {
+        let mut items = doctree::List::default();
+        for node in value.children.iter() {
+            match node {
+                markdown::mdast::Node::ListItem(item) => items.push(item.try_into()?),
+                any @ _ => {
+                    return Err(ParseError::Unsupported(format!(
+                        "Not a list item: {:?}",
+                        any
+                    )))
+                }
+            }
+        }
+        Ok(items)
+    }
+}
+
+impl TryFrom<&markdown::mdast::ListItem> for doctree::ListItem {
+    type Error = ParseError;
+    fn try_from(value: &markdown::mdast::ListItem) -> Result<Self, Self::Error> {
+        doctree::Group::try_from(&value.children).map(|g| g.into())
     }
 }

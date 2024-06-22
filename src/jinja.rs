@@ -14,7 +14,7 @@ impl Renderer {
 }
 
 impl site::Renderer for Renderer {
-    fn render(&mut self, mut corpus: content::Corpus) -> crate::Res<site::RenderedSite> {
+    fn render(&mut self, mut corpus: content::Corpus) -> crate::Result<site::RenderedSite> {
         todo!()
     }
 }

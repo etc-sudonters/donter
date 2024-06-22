@@ -1,4 +1,4 @@
-use crate::{config, content::Corpus, jinja, linker, Res};
+use crate::{config, content::Corpus, jinja, linker, Result};
 
 pub struct Site {
     pre: Vec<Box<dyn Preprocessor>>,
@@ -72,19 +72,19 @@ impl Site {
 }
 
 pub trait Preprocessor {
-    fn run(&mut self, corpus: &mut Corpus) -> Res<()>;
+    fn run(&mut self, corpus: &mut Corpus) -> Result<()>;
 }
 pub trait Processor {
-    fn run(&mut self, corpus: &mut Corpus) -> Res<()>;
+    fn run(&mut self, corpus: &mut Corpus) -> Result<()>;
 }
 pub trait Postprocessor {
-    fn run(&mut self, corpus: &mut Corpus) -> Res<()>;
+    fn run(&mut self, corpus: &mut Corpus) -> Result<()>;
 }
 pub trait Linker {
-    fn link(&mut self, corpus: &mut Corpus) -> Res<()>;
+    fn link(&mut self, corpus: &mut Corpus) -> Result<()>;
 }
 pub trait Renderer {
-    fn render(&mut self, corpus: Corpus) -> Res<RenderedSite>;
+    fn render(&mut self, corpus: Corpus) -> Result<RenderedSite>;
 }
 
 pub struct RenderedSite {}

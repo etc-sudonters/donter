@@ -8,7 +8,7 @@ pub fn default() -> Linker {
 pub struct Linker {}
 
 impl site::Linker for Linker {
-    fn link(&mut self, corpus: &mut content::Corpus) -> crate::Res<()> {
+    fn link(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
         todo!()
     }
 }

@@ -1,14 +1,25 @@
 use crate::files;
 use crate::{content, doctree};
-use std::ops::{Deref, DerefMut};
 
-use super::translate::{ParseError, ParseResult};
+use super::translate::ParseError;
 
-fn try_parse<'a, S: AsRef<str>>(s: S) -> ParseResult {
+fn try_parse<'a, S: AsRef<str>>(s: S) -> Result<doctree::Document, ParseError> {
+    use markdown::mdast::Node;
+    let mut doc = doctree::Document::default();
     match markdown::to_mdast(s.as_ref(), &Default::default()) {
-        Ok(mdast) => doctree::DocumentPart::try_from(&mdast),
-        _ => Err(ParseError),
-    }
+        Err(e) => panic!("err: {}", e),
+        Ok(node) => match node {
+            Node::Root(root) => {
+                for node in root.children.iter() {
+                    doc.push(node.try_into()?);
+                }
+            }
+            // root must be first node
+            _ => panic!("expected root node"),
+        },
+    };
+
+    Ok(doc)
 }
 
 pub struct Loader {}
@@ -20,26 +31,26 @@ impl Default for Loader {
 }
 
 impl content::Loader for Loader {
-    fn accept(&mut self, path: &files::FilePath) -> crate::Res<bool> {
+    fn accept(&mut self, path: &files::FilePath) -> crate::Result<bool> {
         match path.as_ref().extension() {
             None => Ok(false),
             Some(ext) => Ok("md" == ext),
         }
     }
+
     fn load(
         &mut self,
-        path: &files::FilePath,
+        mut content: Box<dyn std::io::Read>,
         corpus: &mut crate::content::Corpus,
-        builder: &mut content::PageBuilder,
-    ) -> crate::Res<()> {
-        let mut builder = PageBuilder::from(builder);
+        mut builder: content::PageBuilder,
+    ) -> crate::Result<()> {
+        let mut text = String::new();
+        let _ = content.read_to_string(&mut text)?;
         corpus.push_page(
-            builder
+            PageBuilder(builder)
                 // order matters because we're wrapping and only intercept some calls into ourself
-                .contents(std::fs::read_to_string(path)?)
-                .path(path.to_owned())
-                .build()
-                .unwrap(),
+                .contents(text)?
+                .try_build()?,
         );
 
         Ok(())
@@ -47,36 +58,19 @@ impl content::Loader for Loader {
 }
 
 // don't carry _ANY_ state of our own b/c it'll be lost
-struct PageBuilder<'a>(&'a mut content::PageBuilder);
+struct PageBuilder(content::PageBuilder);
 
-impl<'a> PageBuilder<'a> {
-    fn contents(&mut self, c: String) -> &mut PageBuilder<'a> {
+impl PageBuilder {
+    fn contents(self, c: String) -> crate::Result<content::PageBuilder> {
         match try_parse(c) {
-            Ok(tree) => {
-                self.0.contents(doctree::Document::from(tree));
+            Ok(doc) => {
+                let (content, footnotes, hrefs) = doc.destruct();
+                let mut builder = self.0.contents(content);
+                builder.footnotes().gather(footnotes);
+                builder.hrefs().gather(hrefs);
+                Ok(builder)
             }
-            _ => {}
+            Err(any) => Err(Box::new(any)),
         }
-
-        self
-    }
-}
-
-impl<'a> From<&'a mut content::PageBuilder> for PageBuilder<'a> {
-    fn from(value: &'a mut content::PageBuilder) -> Self {
-        PageBuilder(value)
-    }
-}
-
-impl<'a> Deref for PageBuilder<'a> {
-    type Target = content::PageBuilder;
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<'a> DerefMut for PageBuilder<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
     }
 }

@@ -7,6 +7,24 @@ pub struct Document {
     hrefs: Vec<HrefDefinition>,
 }
 
+impl Document {
+    pub fn push(&mut self, part: DocumentPart) {
+        match part {
+            DocumentPart::Href(p) => self.hrefs.push(p),
+            DocumentPart::Element(p) => self.content.push(p),
+            DocumentPart::Footnote(p) => self.footnotes.push(p),
+        }
+    }
+
+    pub fn destruct(self) -> (Element, Vec<FootnoteDefinition>, Vec<HrefDefinition>) {
+        (
+            Element::Group(Group::from_iter(self.content)),
+            self.footnotes,
+            self.hrefs,
+        )
+    }
+}
+
 impl Default for Document {
     fn default() -> Self {
         Document {
@@ -103,7 +121,7 @@ pub enum Element {
     //
     BlockQuote(Group),
     Break,
-    Code(Code),
+    CodeBlock(Code),
     Emphasis(Group),
     FootnoteReference(FootnoteReference),
     Heading(Header),
@@ -117,6 +135,56 @@ pub enum Element {
     Table(Table),
     Text(Text),
     ThematicBreak,
+    List(List),
+}
+
+#[derive(Debug)]
+pub struct List(Vec<ListItem>, ListStyle);
+
+impl List {
+    pub fn style(&mut self, style: ListStyle) {
+        self.1 = style;
+    }
+}
+
+#[derive(Debug)]
+pub enum ListStyle {
+    Ordered,
+    Unordered,
+}
+
+impl Default for List {
+    fn default() -> Self {
+        List(vec![], ListStyle::Unordered)
+    }
+}
+
+impl List {
+    pub fn push(&mut self, item: ListItem) {
+        self.0.push(item);
+    }
+}
+
+#[derive(Debug)]
+pub struct ListItem(Group, ItemStyle);
+
+#[derive(Debug)]
+pub enum ItemStyle {
+    Checked,
+    Unchecked,
+    Plain,
+}
+
+impl From<Group> for ListItem {
+    fn from(value: Group) -> Self {
+        ListItem(value, ItemStyle::Plain)
+    }
+}
+
+impl ListItem {
+    pub fn style(&mut self, style: ItemStyle) {
+        self.1 = style;
+    }
 }
 
 #[derive(Debug)]
@@ -320,6 +388,16 @@ impl FootnoteDefinition {
 }
 
 // marker to use as trait bound
-pub trait Definition {}
-impl Definition for FootnoteDefinition {}
-impl Definition for HrefDefinition {}
+pub trait Definition {
+    fn label(&self) -> String;
+}
+impl Definition for FootnoteDefinition {
+    fn label(&self) -> String {
+        self.id.clone()
+    }
+}
+impl Definition for HrefDefinition {
+    fn label(&self) -> String {
+        self.id.clone()
+    }
+}
