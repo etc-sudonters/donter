@@ -1,7 +1,43 @@
 use std::path::{self, PathBuf};
 
+pub struct NamedReader {
+    filepath: FilePath,
+    reader: Box<dyn std::io::Read>,
+}
+
+impl std::io::Read for NamedReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl NamedReader {
+    pub fn path(&self) -> FilePath {
+        self.filepath.clone()
+    }
+
+    pub fn create(p: FilePath, r: Box<dyn std::io::Read>) -> Self {
+        Self {
+            filepath: p,
+            reader: r,
+        }
+    }
+}
+
+pub enum RecursionBehavior {
+    Recurse,
+    Dont,
+}
+
 pub struct Walker {
     base: DirPath,
+    recurse: RecursionBehavior,
+}
+
+impl Walker {
+    pub fn new(base: DirPath, recurse: RecursionBehavior) -> Walker {
+        Walker { base, recurse }
+    }
 }
 
 impl IntoIterator for Walker {
@@ -9,6 +45,7 @@ impl IntoIterator for Walker {
     type IntoIter = BreadthFirstWalker;
     fn into_iter(self) -> Self::IntoIter {
         BreadthFirstWalker {
+            recurse: self.recurse,
             dirs: vec![self.base],
             files: Vec::new(),
         }
@@ -17,7 +54,10 @@ impl IntoIterator for Walker {
 
 impl From<DirPath> for Walker {
     fn from(value: DirPath) -> Self {
-        Walker { base: value }
+        Walker {
+            base: value,
+            recurse: RecursionBehavior::Recurse,
+        }
     }
 }
 
@@ -26,20 +66,20 @@ pub enum PathKind {
     Dir,
 }
 
+#[derive(Debug)]
 pub enum Path {
     File(FilePath),
     Dir(DirPath),
-    Unsupported,
 }
 
 impl PathKind {
-    pub fn impose(p: path::PathBuf) -> Path {
+    pub fn impose(p: path::PathBuf) -> Option<Path> {
         if p.is_file() {
-            Path::File(FilePath(p))
+            Some(Path::File(FilePath(p)))
         } else if p.is_dir() {
-            Path::Dir(DirPath(p))
+            Some(Path::Dir(DirPath(p)))
         } else {
-            Path::Unsupported
+            None
         }
     }
 }
@@ -74,6 +114,7 @@ impl AsRef<path::Path> for FilePath {
 }
 
 pub struct BreadthFirstWalker {
+    recurse: RecursionBehavior,
     dirs: Vec<DirPath>,
     files: Vec<FilePath>,
 }
@@ -84,6 +125,10 @@ impl BreadthFirstWalker {
     }
 
     fn reload(&mut self) {
+        if matches!(self.recurse, RecursionBehavior::Dont if self.dirs.len() == 0) {
+            return;
+        }
+
         loop {
             let dir = match self.dirs.pop() {
                 None => break,
@@ -102,9 +147,11 @@ impl BreadthFirstWalker {
                 };
 
                 match PathKind::impose(entry.path()) {
-                    Path::File(f) => self.files.push(f),
-                    Path::Dir(d) => self.dirs.push(d),
-                    Path::Unsupported => {}
+                    Some(p) => match p {
+                        Path::File(f) => self.files.push(f),
+                        Path::Dir(d) => self.dirs.push(d),
+                    },
+                    None => {}
                 }
             }
         }

@@ -6,8 +6,6 @@ mod files;
 mod jinja;
 mod linker;
 mod md;
-mod output;
-mod processors;
 mod site;
 
 use std::error::Error;
@@ -24,12 +22,19 @@ fn main() -> Result<()> {
     for path in files::Walker::from(conf.content().base()).into_iter() {
         for l in loaders.iter_mut() {
             if l.accept(&path)? {
-                l.load(
-                    Box::new(std::fs::File::open(&path)?),
-                    &mut corpus,
-                    content::PageBuilder::new().path(&path),
-                )
-                .map_err(|e| content::Error::PageLoad(path.clone(), e))?;
+                let mut builder = content::PageBuilder::new();
+                builder.path(&path);
+                let page = l
+                    .load(
+                        files::NamedReader::create(
+                            path.clone(),
+                            Box::new(std::fs::File::open(&path)?),
+                        ),
+                        builder,
+                    )
+                    .map_err(|e| content::Error::PageLoad(path.clone(), e))?;
+                corpus.add_page(page);
+                break;
             }
         }
     }

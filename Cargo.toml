@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 markdown = "1.0.0-alpha.17"
+minijinja = { version = "2.0.2", features = ["loader"]}
+serde = "1.0.203"

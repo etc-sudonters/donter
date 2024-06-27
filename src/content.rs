@@ -1,85 +1,86 @@
-use crate::{content, doctree, files, Result};
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
-
-pub fn default() -> Corpus {
-    Default::default()
-}
-
-#[derive(Debug)]
-pub struct Corpus {
-    pages: Vec<Page>,
-    included: Vec<IncludedPath>,
-}
-
-impl Corpus {
-    pub fn push_page(&mut self, p: Page) {
-        self.pages.push(p);
-    }
-}
-
-impl Default for Corpus {
-    fn default() -> Self {
-        Corpus {
-            pages: Vec::new(),
-            included: Vec::new(),
-        }
-    }
-}
+use crate::{doctree, files, Result};
+use std::collections::HashMap;
+use std::fmt::Display;
 
 pub struct PageBuilder {
-    content: Option<doctree::Element>,
+    contents: Vec<doctree::Element>,
     filepath: Option<files::FilePath>,
+    tags: Vec<Tag>,
     notes: Option<Definitions<doctree::FootnoteDefinition>>,
-    hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    page_hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    when: Option<Date>,
+    page_status: PageStatus,
 }
 
 impl PageBuilder {
     pub fn new() -> PageBuilder {
         PageBuilder {
-            content: None,
-            filepath: None,
-            notes: None,
-            hrefs: None,
+            contents: Default::default(),
+            filepath: Default::default(),
+            tags: Default::default(),
+            notes: Default::default(),
+            page_hrefs: Default::default(),
+            when: Default::default(),
+            page_status: PageStatus::Published,
         }
     }
 
-    pub fn contents(mut self, content: doctree::Element) -> Self {
-        self.content = Some(content);
+    pub fn tags<I: IntoIterator<Item = Tag>>(&mut self, i: I) -> &mut Self {
+        self.tags.extend(i.into_iter());
         self
     }
 
-    pub fn path(mut self, f: &files::FilePath) -> Self {
+    pub fn written(&mut self, d: Date) -> &mut Self {
+        self.when = Some(d);
+        self
+    }
+
+    pub fn status(&mut self, s: PageStatus) -> &mut Self {
+        self.page_status = s;
+        self
+    }
+
+    pub fn content(&mut self, content: doctree::Element) -> &mut Self {
+        self.contents.push(content);
+        self
+    }
+
+    pub fn path(&mut self, f: &files::FilePath) -> &mut Self {
         self.filepath = Some(f.to_owned());
         self
     }
 
-    pub fn footnotes(&mut self) -> &mut Definitions<doctree::FootnoteDefinition> {
-        self.notes.get_or_insert_with(Default::default)
+    pub fn footnotes<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnOnce(&mut Definitions<doctree::FootnoteDefinition>),
+    {
+        let mut footnotes = self.notes.get_or_insert_with(Default::default);
+        f(footnotes);
+        self
     }
 
-    pub fn hrefs(&mut self) -> &mut Definitions<doctree::HrefDefinition> {
-        self.hrefs.get_or_insert_with(Default::default)
+    pub fn hrefs<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnOnce(&mut Definitions<doctree::HrefDefinition>),
+    {
+        let mut hrefs = self.page_hrefs.get_or_insert_with(Default::default);
+        f(hrefs);
+        self
     }
 
-    // returns the built page, or the builder and a description of the error
-    pub fn try_build(mut self) -> crate::Result<Page> {
-        if self.content.is_none() || self.filepath.is_none() {
-            Err(Box::new(Error::IncompleteLoader))
-        } else {
-            Ok(Page {
-                meta: PageMetadata {
-                    path: self.filepath.take().unwrap(),
-                    tags: vec![],
-                    when: Date("".to_owned()),
-                    status: PageStatus::Draft,
-                },
-                content: PageContents {
-                    content: self.content.take().unwrap(),
-                    footnotes: self.notes.take(),
-                    hrefs: self.hrefs.take(),
-                },
-            })
-        }
+    pub fn build(mut self) -> Result<Page> {
+        Ok(Page {
+            meta: PageMetadata {
+                path: self.filepath.unwrap(),
+                when: self.when.take(),
+                status: self.page_status,
+            },
+            content: PageContents {
+                content: self.contents,
+                footnotes: self.notes,
+                hrefs: self.page_hrefs,
+            },
+        })
     }
 }
 
@@ -92,8 +93,7 @@ pub struct Page {
 #[derive(Debug)]
 pub struct PageMetadata {
     path: files::FilePath,
-    tags: Vec<Tag>,
-    when: Date,
+    when: Option<Date>,
     status: PageStatus,
 }
 
@@ -111,7 +111,7 @@ pub enum PageStatus {
 
 #[derive(Debug)]
 pub struct PageContents {
-    content: doctree::Element,
+    content: Vec<doctree::Element>,
     footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
     hrefs: Option<Definitions<doctree::HrefDefinition>>,
 }
@@ -161,24 +161,65 @@ impl<T: doctree::Definition> Definitions<T> {
     }
 }
 
-#[derive(Debug)]
-pub struct IncludedPath(PathBuf);
+pub fn default() -> Corpus {
+    Default::default()
+}
 
-pub trait Loader {
-    fn accept(&mut self, path: &files::FilePath) -> Result<bool>;
-    fn load(
-        &mut self,
-        content: Box<dyn std::io::Read>,
-        corpus: &mut crate::content::Corpus,
-        builder: content::PageBuilder,
-    ) -> crate::Result<()>;
+#[derive(Debug)]
+pub struct Corpus {
+    pages: Vec<Page>,
+    included: Vec<IncludedPath>,
+}
+
+pub enum CorpusEntry {
+    Page(Page),
+    StaticAsset(IncludedPath),
+}
+
+#[derive(Debug)]
+pub struct IncludedPath(files::Path);
+
+impl Corpus {
+    pub fn add_page(&mut self, p: Page) {
+        self.pages.push(p);
+    }
+
+    pub fn include_asset(&mut self, p: files::Path) {}
+
+    pub fn entries(self) -> CorpusEntries {
+        let (pages, included) = (self.pages, self.included);
+
+        let entries = pages.into_iter().map(|p| CorpusEntry::Page(p));
+        let includes = included.into_iter().map(|p| CorpusEntry::StaticAsset(p));
+
+        CorpusEntries(entries.chain(includes).collect())
+    }
+}
+
+pub struct CorpusEntries(Vec<CorpusEntry>);
+
+impl Iterator for CorpusEntries {
+    type Item = CorpusEntry;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
+    }
+}
+
+impl Default for Corpus {
+    fn default() -> Self {
+        Corpus {
+            pages: Vec::new(),
+            included: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum Error {
     PageLoad(files::FilePath, Box<dyn std::error::Error>),
-    IncompleteLoader,
 }
+
 impl std::error::Error for Error {}
 
 impl Display for Error {

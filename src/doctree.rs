@@ -1,121 +1,6 @@
 use std::fmt::Debug;
 
 #[derive(Debug)]
-pub struct Document {
-    content: Vec<Element>,
-    footnotes: Vec<FootnoteDefinition>,
-    hrefs: Vec<HrefDefinition>,
-}
-
-impl Document {
-    pub fn push(&mut self, part: DocumentPart) {
-        match part {
-            DocumentPart::Href(p) => self.hrefs.push(p),
-            DocumentPart::Element(p) => self.content.push(p),
-            DocumentPart::Footnote(p) => self.footnotes.push(p),
-        }
-    }
-
-    pub fn destruct(self) -> (Element, Vec<FootnoteDefinition>, Vec<HrefDefinition>) {
-        (
-            Element::Group(Group::from_iter(self.content)),
-            self.footnotes,
-            self.hrefs,
-        )
-    }
-}
-
-impl Default for Document {
-    fn default() -> Self {
-        Document {
-            content: vec![],
-            footnotes: vec![],
-            hrefs: vec![],
-        }
-    }
-}
-
-impl FromIterator<DocumentPart> for Document {
-    fn from_iter<T: IntoIterator<Item = DocumentPart>>(iter: T) -> Self {
-        let mut doc = Document::default();
-
-        for part in iter.into_iter() {
-            match part {
-                DocumentPart::Element(elm) => {
-                    doc.content.push(elm);
-                }
-                DocumentPart::Href(href) => {
-                    doc.hrefs.push(href);
-                }
-                DocumentPart::Footnote(ftn) => {
-                    doc.footnotes.push(ftn);
-                }
-            }
-        }
-
-        doc
-    }
-}
-
-impl FromIterator<Element> for Document {
-    fn from_iter<T: IntoIterator<Item = Element>>(iter: T) -> Self {
-        Document {
-            content: iter
-                .into_iter()
-                // hoist root to top if we find it
-                .flat_map(|elm| match elm {
-                    Element::Group(r) => r.children,
-                    _ => vec![elm],
-                })
-                .collect(),
-            ..Default::default()
-        }
-    }
-}
-
-impl From<DocumentPart> for Document {
-    fn from(value: DocumentPart) -> Self {
-        Document::from_iter(vec![value])
-    }
-}
-
-impl From<Element> for Document {
-    fn from(value: Element) -> Self {
-        Document {
-            content: match value {
-                Element::Group(r) => r.children,
-                _ => vec![value],
-            },
-            ..Default::default()
-        }
-    }
-}
-
-pub enum DocumentPart {
-    Element(Element),
-    Footnote(FootnoteDefinition),
-    Href(HrefDefinition),
-}
-
-impl From<Element> for DocumentPart {
-    fn from(value: Element) -> Self {
-        DocumentPart::Element(value)
-    }
-}
-
-impl From<FootnoteDefinition> for DocumentPart {
-    fn from(value: FootnoteDefinition) -> Self {
-        DocumentPart::Footnote(value)
-    }
-}
-
-impl From<HrefDefinition> for DocumentPart {
-    fn from(value: HrefDefinition) -> Self {
-        DocumentPart::Href(value)
-    }
-}
-
-#[derive(Debug)]
 pub enum Element {
     Group(Group),
     Empty,
@@ -124,12 +9,11 @@ pub enum Element {
     Break,
     CodeBlock(Code),
     Emphasis(Group),
+    Delete(Group),
     FootnoteReference(FootnoteReference),
     Heading(Header),
-    Image(Image),
-    ImageReference(HrefReference),
+    ImageReference(ImageReference),
     InlineCode(Code),
-    Link(Link),
     HrefReference(HrefReference),
     Paragraph(Group),
     Strong(Group),
@@ -191,6 +75,20 @@ impl ListItem {
 #[derive(Debug)]
 pub struct Group {
     children: Vec<Element>,
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Self {
+            children: Vec::new(),
+        }
+    }
+}
+
+impl Group {
+    pub fn push(&mut self, elm: Element) {
+        self.children.push(elm)
+    }
 }
 
 #[derive(Debug)]
@@ -340,15 +238,46 @@ impl Image {
 }
 
 #[derive(Debug)]
+pub struct ImageReference {
+    href: String,
+    alt: String,
+}
+
+impl ImageReference {
+    pub fn create(href: String, alt: String) -> ImageReference {
+        Self { href, alt }
+    }
+}
+
+#[derive(Debug)]
+pub struct Table {
+    rows: Vec<TableRow>,
+}
+
+impl Table {
+    pub fn new() -> Table {
+        Self {
+            rows: Default::default(),
+        }
+    }
+
+    pub fn push(&mut self, row: TableRow) {
+        self.rows.push(row);
+    }
+}
+
+#[derive(Debug)]
 pub struct TableRow {
     cells: Vec<TableCell>,
 }
 
-impl FromIterator<TableCell> for TableRow {
-    fn from_iter<T: IntoIterator<Item = TableCell>>(iter: T) -> Self {
-        Self {
-            cells: iter.into_iter().collect(),
-        }
+impl TableRow {
+    pub fn new() -> TableRow {
+        Self { cells: vec![] }
+    }
+
+    pub fn push(&mut self, cell: TableCell) {
+        self.cells.push(cell);
     }
 }
 
@@ -362,24 +291,23 @@ impl TableCell {
 }
 
 #[derive(Debug)]
-pub struct Table {
-    rows: Vec<TableRow>,
-}
-
-impl FromIterator<TableRow> for Table {
-    fn from_iter<T: IntoIterator<Item = TableRow>>(iter: T) -> Self {
-        Self {
-            rows: iter.into_iter().collect(),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct FootnoteReference(String);
 
 impl FootnoteReference {
     pub fn create(id: String) -> Self {
         Self(id)
+    }
+}
+
+impl From<&String> for FootnoteReference {
+    fn from(value: &String) -> Self {
+        FootnoteReference(value.clone())
+    }
+}
+
+impl From<FootnoteReference> for Element {
+    fn from(value: FootnoteReference) -> Self {
+        Element::FootnoteReference(value)
     }
 }
 
@@ -390,10 +318,10 @@ pub struct FootnoteDefinition {
 }
 
 impl FootnoteDefinition {
-    pub fn create(id: String, content: Element) -> Self {
+    pub fn create<E: Into<Element>>(id: String, content: E) -> Self {
         Self {
             id,
-            content: Box::new(content),
+            content: Box::new(content.into()),
         }
     }
 }
@@ -410,5 +338,15 @@ impl Definition for FootnoteDefinition {
 impl Definition for HrefDefinition {
     fn label(&self) -> String {
         self.id.clone()
+    }
+}
+
+impl Code {
+    pub fn block(self) -> Element {
+        Element::CodeBlock(self)
+    }
+
+    pub fn inline(self) -> Element {
+        Element::InlineCode(self)
     }
 }
