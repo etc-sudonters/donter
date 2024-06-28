@@ -6,7 +6,9 @@ mod files;
 mod jinja;
 mod linker;
 mod md;
+mod processors;
 mod site;
+mod urls;
 
 use std::error::Error;
 
@@ -19,7 +21,7 @@ fn main() -> Result<()> {
     let mut corpus = content::default();
     let mut loaders = md::default();
 
-    for path in files::Walker::from(conf.content().base()).into_iter() {
+    for path in files::Walker::from(&conf.content.base).into_iter() {
         for l in loaders.iter_mut() {
             if l.accept(&path)? {
                 let mut builder = content::PageBuilder::new();
@@ -39,7 +41,42 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("{:#?}", corpus);
+    let mut render_builder = jinja::Builder::new();
+    render_builder.add_template_dir(conf.site.templates)?;
+    let mut renderer: minijinja::Environment<'_> = render_builder.into();
 
+    for entry in corpus.entries() {
+        match entry {
+            content::CorpusEntry::Page(p) => {
+                println!("Rendering {}", p.meta.path);
+                match renderer.get_template("page.html") {
+                    Ok(tpl) => {
+                        let ctx = minijinja::context! {
+                          page => minijinja::context! {
+                            filename => String::from(p.meta.path),
+                            footnotes => p.content.footnotes,
+                          }
+                        };
+                        match tpl.render(ctx) {
+                            Ok(rendered) => {
+                                println!("Rendered: {}", rendered);
+                            }
+                            Err(e) => {
+                                println!("Failed to render template 'page.html': {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to get template 'page.html': {}", e);
+                    }
+                }
+            }
+            _ => {}
+        };
+    }
+
+    //println!("{:#?}", corpus);
+
+    println!("all done!");
     Ok(())
 }

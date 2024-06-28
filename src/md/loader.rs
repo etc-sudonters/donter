@@ -28,6 +28,15 @@ impl site::Loader for Loader {
         use markdown;
         let mut buf = String::new();
         content.read_to_string(&mut buf)?;
+
+        let opts = markdown::ParseOptions {
+            constructs: markdown::Constructs {
+                frontmatter: true,
+                ..markdown::Constructs::gfm()
+            },
+            ..markdown::ParseOptions::gfm()
+        };
+
         let node = markdown::to_mdast(&buf, &markdown::ParseOptions::gfm())
             .map_err(|e| Error::ParseError(e))?;
         builder.path(&content.path());

@@ -9,6 +9,32 @@ pub trait Loader {
     ) -> crate::Result<content::Page>;
 }
 
+pub struct Processors(Vec<Box<dyn Processor>>);
+
+impl Default for Processors {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl Processors {
+    pub fn new(p: Vec<Box<dyn Processor>>) -> Self {
+        Self(p)
+    }
+
+    pub fn push(&mut self, p: Box<dyn Processor>) {
+        self.0.push(p)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Box<dyn Processor>> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Box<dyn Processor>> {
+        self.0.iter_mut()
+    }
+}
+
 pub trait Processor {
     fn initialize(&mut self, corpus: &mut content::Corpus) -> Result<()> {
         Ok(())

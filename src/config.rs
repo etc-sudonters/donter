@@ -4,33 +4,25 @@ use std::env;
 
 #[derive(Clone, Debug)]
 pub struct Configuration {
-    content_: Content,
-    site_: Site,
+    pub(crate) content: Content,
+    pub(crate) site: Site,
 }
 
 pub fn load(args: env::Args) -> Result<Configuration> {
-    let content_base = args.into_iter().nth(1).expect("content path is required");
-
+    let these_args: Vec<String> = args.into_iter().collect();
     Ok(Configuration {
-        content_: Content {
-            base: unsafe { DirPath::new(content_base) },
+        content: Content {
+            base: unsafe { DirPath::new(these_args.get(1).unwrap()) },
         },
-        site_: Site {},
+        site: Site {
+            templates: unsafe { DirPath::new(these_args.get(2).unwrap()) },
+        },
     })
-}
-
-impl Configuration {
-    pub fn content(&mut self) -> Content {
-        self.content_.clone()
-    }
-    pub fn site(&mut self) -> Site {
-        self.site_.clone()
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Content {
-    base: DirPath,
+    pub(crate) base: DirPath,
 }
 impl Content {
     pub fn base(&self) -> DirPath {
@@ -39,4 +31,6 @@ impl Content {
 }
 
 #[derive(Clone, Debug)]
-pub struct Site {}
+pub struct Site {
+    pub(crate) templates: DirPath,
+}

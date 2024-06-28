@@ -1,4 +1,4 @@
-use std::path::{self, PathBuf};
+use std::{fmt::Display, path};
 
 pub struct NamedReader {
     filepath: FilePath,
@@ -52,6 +52,12 @@ impl IntoIterator for Walker {
     }
 }
 
+impl From<&DirPath> for Walker {
+    fn from(value: &DirPath) -> Self {
+        Walker::from(value.to_owned())
+    }
+}
+
 impl From<DirPath> for Walker {
     fn from(value: DirPath) -> Self {
         Walker {
@@ -88,16 +94,48 @@ impl PathKind {
 pub struct FilePath(path::PathBuf);
 
 impl FilePath {
-    pub unsafe fn new<P: Into<PathBuf>>(p: P) -> FilePath {
+    pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> FilePath {
         FilePath(p.into())
+    }
+}
+
+impl From<FilePath> for String {
+    fn from(value: FilePath) -> Self {
+        value
+            .0
+            .into_os_string()
+            .into_string()
+            .expect("aaaaahh! weird file name")
+    }
+}
+
+impl From<&FilePath> for String {
+    fn from(value: &FilePath) -> Self {
+        String::from(value.clone())
+    }
+}
+
+impl Display for FilePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DirPath(path::PathBuf);
 impl DirPath {
-    pub unsafe fn new<P: Into<PathBuf>>(p: P) -> DirPath {
+    pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> DirPath {
         DirPath(p.into())
+    }
+}
+
+impl From<DirPath> for String {
+    fn from(value: DirPath) -> Self {
+        value
+            .0
+            .into_os_string()
+            .into_string()
+            .expect("aaaaahh! weird file name")
     }
 }
 

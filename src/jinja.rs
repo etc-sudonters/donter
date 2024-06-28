@@ -1,15 +1,10 @@
-use std::{fmt::Display, intrinsics::discriminant_value, mem};
+use std::{fmt::Display, io::Read, mem};
 
 use minijinja;
 
-use crate::files;
+use crate::files::{self, DirPath};
 
 pub struct Builder<'a>(minijinja::Environment<'a>);
-
-pub struct TemplateDirectory {
-    pub path: files::DirPath,
-    pub recurse: files::RecursionBehavior,
-}
 
 impl<'a> From<Builder<'a>> for minijinja::Environment<'a> {
     fn from(value: Builder<'a>) -> Self {
@@ -31,12 +26,13 @@ impl<'a> Builder<'a> {
 
         let mut fh = std::fs::File::open(path)?;
         let mut buf = String::new();
+        fh.read_to_string(&mut buf)?;
         self.0.add_template_owned(tplname, buf)?;
         Ok(())
     }
 
-    pub fn add_template_dir(&mut self, dir: TemplateDirectory) -> crate::Result<()> {
-        for path in files::Walker::new(dir.path, dir.recurse).into_iter() {
+    pub fn add_template_dir(&mut self, dir: DirPath) -> crate::Result<()> {
+        for path in files::Walker::from(dir).into_iter() {
             if matches!(path.as_ref().extension(), Some(ext) if ext == "html") {
                 self.add_template_file(path)?;
             }

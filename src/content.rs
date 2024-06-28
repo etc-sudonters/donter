@@ -2,6 +2,8 @@ use crate::{doctree, files, Result};
 use std::collections::HashMap;
 use std::fmt::Display;
 
+pub struct PageToken(u64);
+
 pub struct PageBuilder {
     contents: Vec<doctree::Element>,
     filepath: Option<files::FilePath>,
@@ -86,13 +88,13 @@ impl PageBuilder {
 
 #[derive(Debug)]
 pub struct Page {
-    meta: PageMetadata,
-    content: PageContents,
+    pub(crate) meta: PageMetadata,
+    pub(crate) content: PageContents,
 }
 
 #[derive(Debug)]
 pub struct PageMetadata {
-    path: files::FilePath,
+    pub(crate) path: files::FilePath,
     when: Option<Date>,
     status: PageStatus,
 }
@@ -109,14 +111,14 @@ pub enum PageStatus {
     Draft,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct PageContents {
     content: Vec<doctree::Element>,
-    footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
+    pub(crate) footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
     hrefs: Option<Definitions<doctree::HrefDefinition>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Definitions<T: doctree::Definition> {
     labels: Vec<String>,
     // label idx -> definition

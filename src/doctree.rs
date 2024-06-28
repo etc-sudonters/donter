@@ -1,29 +1,28 @@
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum Element {
-    Group(Group),
-    Empty,
-    //
     BlockQuote(Group),
     Break,
     CodeBlock(Code),
-    Emphasis(Group),
     Delete(Group),
+    Emphasis(Group),
+    Empty,
     FootnoteReference(FootnoteReference),
+    Group(Group),
     Heading(Header),
+    HrefReference(HrefReference),
     ImageReference(ImageReference),
     InlineCode(Code),
-    HrefReference(HrefReference),
+    List(List),
     Paragraph(Group),
     Strong(Group),
     Table(Table),
     Text(Text),
     ThematicBreak,
-    List(List),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct List(Vec<ListItem>, ListStyle);
 
 impl List {
@@ -32,7 +31,7 @@ impl List {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum ListStyle {
     Ordered,
     Unordered,
@@ -50,10 +49,10 @@ impl List {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct ListItem(Group, ItemStyle);
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum ItemStyle {
     Checked,
     Unchecked,
@@ -72,7 +71,7 @@ impl ListItem {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Group {
     children: Vec<Element>,
 }
@@ -91,7 +90,7 @@ impl Group {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct CodeLiteral(String);
 
 impl From<String> for CodeLiteral {
@@ -100,7 +99,7 @@ impl From<String> for CodeLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct CodeLanguage(String);
 
 impl From<String> for CodeLanguage {
@@ -109,7 +108,7 @@ impl From<String> for CodeLanguage {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Code {
     code: CodeLiteral,
     lang: Option<CodeLanguage>,
@@ -150,7 +149,7 @@ impl From<Group> for Element {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Header {
     depth: u8,
     children: Box<Element>,
@@ -165,6 +164,7 @@ impl Header {
     }
 }
 
+#[derive(serde::Serialize)]
 pub struct Text(String);
 
 impl Text {
@@ -179,7 +179,7 @@ impl Debug for Text {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Link {
     href: String,
     content: Box<Element>,
@@ -196,7 +196,7 @@ impl Link {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct HrefDefinition {
     id: String,
     href: String,
@@ -208,7 +208,7 @@ impl HrefDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct HrefReference {
     content: Box<Element>,
     id: String,
@@ -225,7 +225,7 @@ impl HrefReference {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Image {
     alt: String,
     href: String,
@@ -237,7 +237,7 @@ impl Image {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct ImageReference {
     href: String,
     alt: String,
@@ -249,7 +249,7 @@ impl ImageReference {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Table {
     rows: Vec<TableRow>,
 }
@@ -266,7 +266,7 @@ impl Table {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct TableRow {
     cells: Vec<TableCell>,
 }
@@ -281,7 +281,7 @@ impl TableRow {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct TableCell(Box<Element>);
 
 impl TableCell {
@@ -290,7 +290,7 @@ impl TableCell {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct FootnoteReference(String);
 
 impl FootnoteReference {
@@ -311,7 +311,7 @@ impl From<FootnoteReference> for Element {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct FootnoteDefinition {
     id: String,
     content: Box<Element>,
