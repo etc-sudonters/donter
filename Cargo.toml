@@ -9,3 +9,4 @@ edition = "2021"
 markdown = "1.0.0-alpha.17"
 minijinja = { version = "2.0.2", features = ["loader"]}
 serde = { version = "1.0.203", features = ["serde_derive"] }
+url = {version = "2", features = ["serde"]}

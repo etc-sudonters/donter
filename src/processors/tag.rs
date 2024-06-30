@@ -9,16 +9,18 @@ pub struct Tags {
 }
 
 impl site::Processor for Tags {
-    fn initialize(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
+    fn initialize<'init, 'site>(
+        &'init mut self,
+        corpus: &'init mut site::Initializer<'site, '_>,
+    ) -> crate::Result<()>
+    where
+        'site: 'init,
+    {
         // 1. Add tag things to jinja
         Ok(())
     }
 
-    fn page_load(
-        &mut self,
-        corpus: &mut content::Corpus,
-        page: &content::Page,
-    ) -> crate::Result<()> {
+    fn page_load(&mut self, page: &mut content::PageBuilder) -> crate::Result<()> {
         // read tags off page and record them here
         // 1. How do we get the PageToken?
         Ok(())
@@ -33,7 +35,7 @@ impl site::Processor for Tags {
         Ok(())
     }
 
-    fn site_render(&mut self) -> crate::Result<()> {
+    fn site_render(&mut self, site: &mut site::RenderedSite) -> crate::Result<()> {
         // generate tag pages
         Ok(())
     }

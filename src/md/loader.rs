@@ -1,6 +1,5 @@
-use std::io::Read;
-
 use crate::{content, files, site};
+use std::io::Read;
 
 pub struct Loader {}
 
@@ -12,7 +11,7 @@ impl Default for Loader {
 
 impl site::Loader for Loader {
     fn accept(&mut self, path: &files::FilePath) -> crate::Result<bool> {
-        match path.as_ref().extension() {
+        match path.as_path().extension() {
             None => Ok(false),
             Some(ext) => Ok("md" == ext),
         }
@@ -20,9 +19,9 @@ impl site::Loader for Loader {
 
     fn load(
         &mut self,
-        mut content: files::NamedReader,
-        mut builder: content::PageBuilder,
-    ) -> crate::Result<content::Page> {
+        mut content: Box<dyn Read>,
+        builder: &mut content::PageBuilder,
+    ) -> crate::Result<()> {
         use super::Error;
         use crate::md::walker::MarkdownPageBuilder;
         use markdown;
@@ -39,7 +38,6 @@ impl site::Loader for Loader {
 
         let node = markdown::to_mdast(&buf, &markdown::ParseOptions::gfm())
             .map_err(|e| Error::ParseError(e))?;
-        builder.path(&content.path());
         MarkdownPageBuilder::new(builder).build(&node)
     }
 }

@@ -1,50 +1,233 @@
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Display,
+    mem,
+};
+
+use url::Url;
+
 use crate::{content, files, jinja, Result};
+
+pub struct SiteBuilder(Vec<Box<dyn Processor>>);
+
+impl SiteBuilder {
+    pub fn new() -> SiteBuilder {
+        Self(vec![])
+    }
+
+    pub fn with<P: 'static + Processor>(&mut self, processor: P) -> &mut Self {
+        self.0.push(Box::new(processor));
+        self
+    }
+
+    pub fn create<'a>(&mut self) -> crate::Result<Site<'a>> {
+        let mut processors = vec![];
+        mem::swap(&mut self.0, &mut processors);
+        Site::create(processors)
+    }
+}
+
+pub struct Site<'a> {
+    renderer: minijinja::Environment<'a>,
+    processors: Vec<Box<dyn Processor>>,
+    loaders: Vec<Box<dyn Loader>>,
+}
+
+pub struct Initializer<'builder, 'env> {
+    renderer: jinja::Builder<'builder, 'env>,
+    loaders: &'builder mut Vec<Box<dyn Loader>>,
+}
+
+impl<'builder, 'env> Initializer<'builder, 'env> {
+    pub fn add_loader(&mut self, loader: Box<dyn Loader>) {
+        self.loaders.push(loader)
+    }
+
+    pub fn configure_renderer<'a, F>(&'a mut self, configure: F) -> crate::Result<()>
+    where
+        'builder: 'a,
+        F: FnOnce(&'a mut jinja::Builder<'builder, 'env>) -> crate::Result<()>,
+    {
+        configure(&mut self.renderer)
+    }
+}
+
+impl<'env> Site<'env> {
+    pub fn create(mut processors: Vec<Box<dyn Processor>>) -> crate::Result<Site<'env>> {
+        let mut renderer = minijinja::Environment::new();
+        let mut loaders = Default::default();
+
+        {
+            let mut builder = Initializer {
+                renderer: jinja::Builder::new(&mut renderer),
+                loaders: &mut loaders,
+            };
+
+            for processor in processors.iter_mut() {
+                processor.initialize(&mut builder)?;
+            }
+        }
+
+        Ok(Site {
+            processors,
+            loaders,
+            renderer,
+        })
+    }
+
+    pub fn load(
+        &mut self,
+        path: &files::DirPath,
+        corpus: &mut content::Corpus,
+    ) -> crate::Result<()> {
+        for path in files::Walker::walk(path, files::RecursionBehavior::Dont) {
+            for loader in self.loaders.iter_mut() {
+                if loader.accept(&path)? {
+                    let mut builder = content::PageBuilder::new(path.clone());
+
+                    loader.load(Box::new(std::fs::File::open(&path)?), &mut builder)?;
+
+                    for processor in self.processors.iter_mut() {
+                        processor.page_load(&mut builder)?;
+                    }
+                    corpus.add_page(builder.build()?);
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn render_page(&mut self, page: content::Page) -> crate::Result<RenderedPage> {
+        let tpl = self
+            .renderer
+            .get_template(&page.meta.tpl_name)
+            .map_err(|e| Box::new(e))?;
+
+        let mut ctx = jinja::RenderContext::new(minijinja::context! {page => &page });
+        for processor in self.processors.iter_mut() {
+            processor.page_render(&page, &mut ctx)?;
+        }
+
+        Ok(tpl.render(ctx).map(RenderedPage)?)
+    }
+
+    pub fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
+        for processor in self.processors.iter_mut() {
+            processor.process(corpus)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn render_corpus(&mut self, corpus: content::Corpus) -> crate::Result<RenderedSite> {
+        let mut site = RenderedSite::new();
+
+        for entry in corpus.entries() {
+            match entry {
+                content::CorpusEntry::Page(mut p) => {
+                    let dest = p.meta.url.clone();
+                    let page = self.render_page(p)?;
+                    site.add_page(dest, page)?;
+                }
+                content::CorpusEntry::StaticAsset(asset) => {
+                    let dest = Url::from_file_path(&asset).unwrap();
+                    site.add_static_asset(dest, asset)?;
+                }
+            }
+        }
+
+        Ok(site)
+    }
+
+    pub fn finalize(&mut self) -> crate::Result<()> {
+        for processor in self.processors.iter_mut() {
+            processor.finalize()?;
+        }
+        Ok(())
+    }
+}
+
+pub struct RenderedPage(String);
+pub struct IncludedAsset;
+
+pub enum Writable {
+    Page(RenderedPage),
+    Asset(IncludedAsset),
+}
+
+pub struct RenderedSite {
+    writables: HashMap<Url, Writable>,
+}
+
+impl RenderedSite {
+    pub fn new() -> RenderedSite {
+        Self {
+            writables: Default::default(),
+        }
+    }
+
+    pub fn add_page(&mut self, path: Url, content: RenderedPage) -> crate::Result<()> {
+        match self.writables.entry(path.clone()) {
+            Entry::Vacant(v) => {
+                v.insert(Writable::Page(content));
+                Ok(())
+            }
+            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(path))),
+        }
+    }
+
+    pub fn add_static_asset(
+        &mut self,
+        path: Url,
+        content: content::IncludedPath,
+    ) -> crate::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum SiteError {
+    AlreadyOccupied(Url),
+}
+
+impl Display for SiteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SiteError::*;
+        write!(f, "SiteError::")?;
+        match self {
+            AlreadyOccupied(dst) => write!(f, "AlreadyOccupied({})", dst),
+        }
+    }
+}
+
+impl std::error::Error for SiteError {}
 
 pub trait Loader {
     fn accept(&mut self, path: &files::FilePath) -> Result<bool>;
     fn load(
         &mut self,
-        content: files::NamedReader,
-        builder: content::PageBuilder,
-    ) -> crate::Result<content::Page>;
-}
-
-pub struct Processors(Vec<Box<dyn Processor>>);
-
-impl Default for Processors {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl Processors {
-    pub fn new(p: Vec<Box<dyn Processor>>) -> Self {
-        Self(p)
-    }
-
-    pub fn push(&mut self, p: Box<dyn Processor>) {
-        self.0.push(p)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Box<dyn Processor>> {
-        self.0.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Box<dyn Processor>> {
-        self.0.iter_mut()
-    }
+        content: Box<dyn std::io::Read>,
+        builder: &mut content::PageBuilder,
+    ) -> crate::Result<()>;
 }
 
 pub trait Processor {
-    fn initialize(&mut self, corpus: &mut content::Corpus) -> Result<()> {
+    fn initialize<'call, 'init>(
+        &'call mut self,
+        site: &'call mut Initializer<'init, '_>,
+    ) -> Result<()>
+    where
+        'init: 'call,
+    {
         Ok(())
     }
 
-    fn page_load(&mut self, corpus: &mut content::Corpus, page: &content::Page) -> Result<()> {
+    fn page_load(&mut self, page: &mut content::PageBuilder) -> Result<()> {
         Ok(())
     }
 
-    fn generate(&mut self, corpus: &mut content::Corpus) -> Result<()> {
+    fn process(&mut self, corpus: &mut content::Corpus) -> Result<()> {
         Ok(())
     }
 
@@ -52,7 +235,7 @@ pub trait Processor {
         Ok(())
     }
 
-    fn site_render(&mut self) -> Result<()> {
+    fn site_render(&mut self, site: &mut RenderedSite) -> Result<()> {
         Ok(())
     }
 
@@ -61,8 +244,6 @@ pub trait Processor {
     }
 }
 
-trait Writer {
-    fn write(&mut self, site: Site) -> Result<()>;
+pub trait Writer {
+    fn write(&mut self, site: RenderedSite) -> crate::Result<()>;
 }
-
-pub struct Site {}

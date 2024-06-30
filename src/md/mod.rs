@@ -1,9 +1,21 @@
-use crate::site::Loader;
 pub mod loader;
 mod walker;
+use crate::site;
+pub use loader::Loader;
 
-pub fn default() -> Vec<Box<dyn Loader>> {
-    vec![Box::new(loader::Loader::default())]
+pub struct Md;
+
+impl site::Processor for Md {
+    fn initialize<'call, 'init>(
+        &'call mut self,
+        site: &'call mut site::Initializer<'init, '_>,
+    ) -> crate::Result<()>
+    where
+        'init: 'call,
+    {
+        site.add_loader(Box::new(Loader::default()));
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

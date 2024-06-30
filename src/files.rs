@@ -1,68 +1,29 @@
 use std::{fmt::Display, path};
 
-pub struct NamedReader {
-    filepath: FilePath,
-    reader: Box<dyn std::io::Read>,
-}
-
-impl std::io::Read for NamedReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.reader.read(buf)
-    }
-}
-
-impl NamedReader {
-    pub fn path(&self) -> FilePath {
-        self.filepath.clone()
-    }
-
-    pub fn create(p: FilePath, r: Box<dyn std::io::Read>) -> Self {
-        Self {
-            filepath: p,
-            reader: r,
-        }
-    }
-}
-
 pub enum RecursionBehavior {
     Recurse,
     Dont,
 }
 
-pub struct Walker {
-    base: DirPath,
+pub struct Walker<'a> {
+    base: &'a DirPath,
     recurse: RecursionBehavior,
 }
 
-impl Walker {
-    pub fn new(base: DirPath, recurse: RecursionBehavior) -> Walker {
-        Walker { base, recurse }
+impl<'a> Walker<'a> {
+    pub fn walk(base: &'a DirPath, recurse: RecursionBehavior) -> impl Iterator<Item = FilePath> {
+        Self { base, recurse }.into_iter()
     }
 }
 
-impl IntoIterator for Walker {
+impl<'a> IntoIterator for Walker<'a> {
     type Item = FilePath;
     type IntoIter = BreadthFirstWalker;
     fn into_iter(self) -> Self::IntoIter {
         BreadthFirstWalker {
             recurse: self.recurse,
-            dirs: vec![self.base],
+            dirs: vec![self.base.clone()],
             files: Vec::new(),
-        }
-    }
-}
-
-impl From<&DirPath> for Walker {
-    fn from(value: &DirPath) -> Self {
-        Walker::from(value.to_owned())
-    }
-}
-
-impl From<DirPath> for Walker {
-    fn from(value: DirPath) -> Self {
-        Walker {
-            base: value,
-            recurse: RecursionBehavior::Recurse,
         }
     }
 }
@@ -76,6 +37,16 @@ pub enum PathKind {
 pub enum Path {
     File(FilePath),
     Dir(DirPath),
+}
+
+impl AsRef<path::Path> for Path {
+    fn as_ref(&self) -> &path::Path {
+        use Path::*;
+        match self {
+            File(p) => p.as_ref(),
+            Dir(p) => p.as_ref(),
+        }
+    }
 }
 
 impl PathKind {
@@ -96,6 +67,10 @@ pub struct FilePath(path::PathBuf);
 impl FilePath {
     pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> FilePath {
         FilePath(p.into())
+    }
+
+    pub fn as_path(&self) -> &path::Path {
+        self.as_ref()
     }
 }
 
@@ -118,6 +93,12 @@ impl From<&FilePath> for String {
 impl Display for FilePath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self))
+    }
+}
+
+impl AsRef<str> for FilePath {
+    fn as_ref(&self) -> &str {
+        self.0.as_os_str().to_str().unwrap()
     }
 }
 

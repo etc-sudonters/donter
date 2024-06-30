@@ -1,29 +1,39 @@
+use url::Url;
+
 use crate::{doctree, files, Result};
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::Path;
 
 pub struct PageToken(u64);
 
+#[derive(Debug, serde::Serialize)]
+pub struct Tag(String);
+
 pub struct PageBuilder {
-    contents: Vec<doctree::Element>,
-    filepath: Option<files::FilePath>,
-    tags: Vec<Tag>,
-    notes: Option<Definitions<doctree::FootnoteDefinition>>,
-    page_hrefs: Option<Definitions<doctree::HrefDefinition>>,
-    when: Option<Date>,
-    page_status: PageStatus,
+    pub(crate) contents: Vec<doctree::Element>,
+    pub(crate) filepath: files::FilePath,
+    pub(crate) url_path: Option<Url>,
+    pub(crate) tags: Vec<Tag>,
+    pub(crate) notes: Option<Definitions<doctree::FootnoteDefinition>>,
+    pub(crate) page_hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    pub(crate) when: Option<Date>,
+    pub(crate) page_status: PageStatus,
+    pub(crate) tpl_name: String,
 }
 
 impl PageBuilder {
-    pub fn new() -> PageBuilder {
+    pub fn new<F: Into<files::FilePath>>(f: F) -> PageBuilder {
         PageBuilder {
             contents: Default::default(),
-            filepath: Default::default(),
+            filepath: f.into(),
+            url_path: Default::default(),
             tags: Default::default(),
             notes: Default::default(),
             page_hrefs: Default::default(),
             when: Default::default(),
             page_status: PageStatus::Published,
+            tpl_name: "page.html".to_owned(),
         }
     }
 
@@ -47,8 +57,15 @@ impl PageBuilder {
         self
     }
 
-    pub fn path(&mut self, f: &files::FilePath) -> &mut Self {
-        self.filepath = Some(f.to_owned());
+    pub fn url(&mut self, d: Url) -> &mut Self {
+        self.url_path = Some(d);
+        self
+    }
+
+    pub fn url_or(&mut self, d: Url) -> &mut Self {
+        if self.url_path.is_none() {
+            self.url_path = Some(d);
+        }
         self
     }
 
@@ -73,9 +90,11 @@ impl PageBuilder {
     pub fn build(mut self) -> Result<Page> {
         Ok(Page {
             meta: PageMetadata {
-                path: self.filepath.unwrap(),
+                origin: Origin(self.filepath),
+                url: self.url_path.unwrap(),
                 when: self.when.take(),
                 status: self.page_status,
+                tpl_name: self.tpl_name,
             },
             content: PageContents {
                 content: self.contents,
@@ -86,26 +105,25 @@ impl PageBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Page {
     pub(crate) meta: PageMetadata,
     pub(crate) content: PageContents,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct PageMetadata {
-    pub(crate) path: files::FilePath,
+    pub(crate) origin: Origin,
+    pub(crate) url: Url,
     when: Option<Date>,
     status: PageStatus,
+    pub(crate) tpl_name: String,
 }
 
-#[derive(Debug)]
-pub struct Tag(String);
-
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Date(String);
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum PageStatus {
     Published,
     Draft,
@@ -181,6 +199,12 @@ pub enum CorpusEntry {
 #[derive(Debug)]
 pub struct IncludedPath(files::Path);
 
+impl AsRef<Path> for IncludedPath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
 impl Corpus {
     pub fn add_page(&mut self, p: Page) {
         self.pages.push(p);
@@ -227,5 +251,30 @@ impl std::error::Error for Error {}
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug)]
+pub struct Origin(files::FilePath);
+
+impl std::ops::Deref for Origin {
+    type Target = files::FilePath;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Origin {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl serde::Serialize for Origin {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.as_path().to_str().unwrap())
     }
 }

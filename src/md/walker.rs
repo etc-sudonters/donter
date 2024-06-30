@@ -1,20 +1,20 @@
 use super::Error;
 use crate::{content, doctree};
 
-pub struct MarkdownPageBuilder {
+pub struct MarkdownPageBuilder<'p> {
     groups: Vec<doctree::Group>,
-    builder: content::PageBuilder,
+    builder: &'p mut content::PageBuilder,
 }
 
-impl MarkdownPageBuilder {
-    pub fn new(builder: content::PageBuilder) -> Self {
+impl<'p> MarkdownPageBuilder<'p> {
+    pub fn new(builder: &'p mut content::PageBuilder) -> Self {
         Self {
             groups: Default::default(),
             builder,
         }
     }
 
-    pub fn build(mut self, node: &markdown::mdast::Node) -> crate::Result<content::Page> {
+    pub fn build(mut self, node: &markdown::mdast::Node) -> crate::Result<()> {
         use markdown::mdast::Node;
         match node {
             Node::Root(r) => {
@@ -23,7 +23,7 @@ impl MarkdownPageBuilder {
                     panic!("Unpopped groups exist");
                 }
                 self.builder.content(grp.into());
-                self.builder.build()
+                Ok(())
             }
             any @ _ => Error::Unexpected(format!("Expected Root, got {:?}", any)).into(),
         }

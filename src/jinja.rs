@@ -2,25 +2,43 @@ use std::{fmt::Display, io::Read, mem};
 
 use minijinja;
 
-use crate::files::{self, DirPath};
+use crate::{files, site};
 
-pub struct Builder<'a>(minijinja::Environment<'a>);
+pub struct Jinja {
+    template_path: files::DirPath,
+}
 
-impl<'a> From<Builder<'a>> for minijinja::Environment<'a> {
-    fn from(value: Builder<'a>) -> Self {
-        value.0
+impl Jinja {
+    pub fn new(template_path: files::DirPath) -> Self {
+        Self { template_path }
     }
 }
 
-impl<'a> Builder<'a> {
-    pub fn new() -> Self {
-        Self(minijinja::Environment::<'a>::new())
+impl site::Processor for Jinja {
+    fn initialize<'call, 'init>(
+        &'call mut self,
+        site: &'call mut site::Initializer<'init, '_>,
+    ) -> crate::Result<()>
+    where
+        'init: 'call,
+    {
+        site.configure_renderer(|renderer| renderer.add_template_dir(&self.template_path))
+    }
+}
+
+pub struct Builder<'builder, 'env>(&'builder mut minijinja::Environment<'env>)
+where
+    'env: 'builder;
+
+impl<'builder, 'env> Builder<'builder, 'env> {
+    pub fn new(renderer: &'builder mut minijinja::Environment<'env>) -> Self {
+        Self(renderer)
     }
 
     pub fn add_template_file(&mut self, path: files::FilePath) -> crate::Result<()> {
         let tplname = {
             // um, maybe we should help
-            let name = path.as_ref().file_name().unwrap();
+            let name = path.as_path().file_name().unwrap();
             name.to_str().unwrap().to_owned()
         };
 
@@ -31,9 +49,9 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    pub fn add_template_dir(&mut self, dir: DirPath) -> crate::Result<()> {
-        for path in files::Walker::from(dir).into_iter() {
-            if matches!(path.as_ref().extension(), Some(ext) if ext == "html") {
+    pub fn add_template_dir(&mut self, dir: &files::DirPath) -> crate::Result<()> {
+        for path in files::Walker::walk(&dir, files::RecursionBehavior::Dont) {
+            if matches!(path.as_path().extension(), Some(ext) if ext == "html") {
                 self.add_template_file(path)?;
             }
         }
@@ -43,9 +61,9 @@ impl<'a> Builder<'a> {
 
     pub fn configure<F>(&mut self, f: F) -> crate::Result<()>
     where
-        F: FnOnce(&mut minijinja::Environment<'a>) -> crate::Result<()>,
+        F: FnOnce(&mut minijinja::Environment<'env>) -> crate::Result<()>,
     {
-        f(&mut self.0)
+        f(self.0)
     }
 }
 
@@ -83,59 +101,6 @@ impl serde::ser::Serialize for RenderContext {
         S: serde::Serializer,
     {
         self.ctx.serialize(serializer)
-    }
-}
-
-pub trait Renderer {
-    fn render(&mut self, tpl_name: &'_ str, ctx: RenderContext) -> crate::Result<String>;
-}
-
-pub fn load_templates<'a>(
-    tpl_path: files::DirPath,
-    env: &mut minijinja::Environment<'a>,
-) -> crate::Result<()> {
-    use std::io::Read;
-    for path in files::Walker::new(tpl_path, files::RecursionBehavior::Dont).into_iter() {
-        if matches!(path.as_ref().extension(), Some(ext) if ext == "html") {
-            let mut buf = String::new();
-            let mut fh = std::fs::File::open(&path)?;
-            fh.read_to_string(&mut buf)?;
-
-            let tplname = {
-                // um, maybe we should help
-                let name = path.as_ref().file_name().unwrap();
-                name.to_str().unwrap().to_owned()
-            };
-
-            env.add_template_owned(tplname, buf)?;
-        }
-    }
-    Ok(())
-}
-
-pub struct Jinja<'a> {
-    jinja: minijinja::Environment<'a>,
-}
-
-impl<'a> Jinja<'a> {
-    pub fn new(jinja: minijinja::Environment<'a>) -> Jinja<'a> {
-        Self { jinja }
-    }
-}
-
-impl<'a> From<minijinja::Environment<'a>> for Jinja<'a> {
-    fn from(value: minijinja::Environment<'a>) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'a> Renderer for Jinja<'a> {
-    fn render(&mut self, tpl_name: &'_ str, ctx: RenderContext) -> crate::Result<String> {
-        let tpl = self.jinja.get_template(tpl_name)?;
-        // what
-        Ok(tpl
-            .render(ctx)
-            .map_err(|err| Box::new(Error::Render(err)))?)
     }
 }
 
