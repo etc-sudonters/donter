@@ -3,10 +3,9 @@ name = "donter"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-markdown = "1.0.0-alpha.17"
+markdown = { version = "1.0.0-alpha.17" }
 minijinja = { version = "2.0.2", features = ["loader"]}
 serde = { version = "1.0.203", features = ["serde_derive"] }
-url = {version = "2", features = ["serde"]}
+url = { version = "2", features = ["serde"]}
+tar = { version = "0.4.41" }

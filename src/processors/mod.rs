@@ -4,6 +4,6 @@ mod linker;
 mod staticfiles;
 mod tag;
 
-pub use linker::Linker;
+pub use linker::{Linker, Options as LinkerOptions};
 pub use staticfiles::StaticFiles;
 pub use tag::Tags;

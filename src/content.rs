@@ -199,6 +199,12 @@ pub enum CorpusEntry {
 #[derive(Debug)]
 pub struct IncludedPath(files::Path);
 
+impl Into<files::Path> for IncludedPath {
+    fn into(self) -> files::Path {
+        self.0
+    }
+}
+
 impl AsRef<Path> for IncludedPath {
     fn as_ref(&self) -> &Path {
         self.0.as_ref()

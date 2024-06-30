@@ -1,1 +1,5 @@
 /target
+/.dumpster
+/output
+*.tar
+*.tar.gz

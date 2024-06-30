@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, VecDeque},
     fmt::Display,
     mem,
 };
@@ -8,10 +8,10 @@ use url::Url;
 
 use crate::{content, files, jinja, Result};
 
-pub struct SiteBuilder(Vec<Box<dyn Processor>>);
+pub struct Builder(Vec<Box<dyn Processor>>);
 
-impl SiteBuilder {
-    pub fn new() -> SiteBuilder {
+impl Builder {
+    pub fn new() -> Builder {
         Self(vec![])
     }
 
@@ -20,14 +20,14 @@ impl SiteBuilder {
         self
     }
 
-    pub fn create<'a>(&mut self) -> crate::Result<Site<'a>> {
+    pub fn create<'a>(&mut self) -> crate::Result<Donter<'a>> {
         let mut processors = vec![];
         mem::swap(&mut self.0, &mut processors);
-        Site::create(processors)
+        Donter::create(processors)
     }
 }
 
-pub struct Site<'a> {
+pub struct Donter<'a> {
     renderer: minijinja::Environment<'a>,
     processors: Vec<Box<dyn Processor>>,
     loaders: Vec<Box<dyn Loader>>,
@@ -52,8 +52,8 @@ impl<'builder, 'env> Initializer<'builder, 'env> {
     }
 }
 
-impl<'env> Site<'env> {
-    pub fn create(mut processors: Vec<Box<dyn Processor>>) -> crate::Result<Site<'env>> {
+impl<'env> Donter<'env> {
+    pub fn create(mut processors: Vec<Box<dyn Processor>>) -> crate::Result<Donter<'env>> {
         let mut renderer = minijinja::Environment::new();
         let mut loaders = Default::default();
 
@@ -68,7 +68,7 @@ impl<'env> Site<'env> {
             }
         }
 
-        Ok(Site {
+        Ok(Donter {
             processors,
             loaders,
             renderer,
@@ -109,7 +109,9 @@ impl<'env> Site<'env> {
             processor.page_render(&page, &mut ctx)?;
         }
 
-        Ok(tpl.render(ctx).map(RenderedPage)?)
+        Ok(tpl
+            .render(ctx)
+            .map(|rendered| RenderedPage(rendered.into_bytes().into()))?)
     }
 
     pub fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
@@ -148,8 +150,27 @@ impl<'env> Site<'env> {
     }
 }
 
-pub struct RenderedPage(String);
-pub struct IncludedAsset;
+pub struct RenderedPage(VecDeque<u8>);
+impl RenderedPage {
+    pub fn read(self) -> impl std::io::Read {
+        self.0
+    }
+
+    pub fn size(&self) -> u64 {
+        self.0.len() as u64
+    }
+}
+
+pub struct IncludedAsset(files::Path);
+impl IncludedAsset {
+    pub fn read(self) -> crate::Result<impl std::io::Read> {
+        Ok(std::fs::File::open(self.0)?)
+    }
+
+    pub fn path(self) -> files::Path {
+        self.0
+    }
+}
 
 pub enum Writable {
     Page(RenderedPage),
@@ -167,13 +188,17 @@ impl RenderedSite {
         }
     }
 
+    pub fn entries(self) -> impl std::iter::Iterator<Item = (Url, Writable)> {
+        self.writables.into_iter()
+    }
+
     pub fn add_page(&mut self, path: Url, content: RenderedPage) -> crate::Result<()> {
-        match self.writables.entry(path.clone()) {
+        match self.writables.entry(path) {
             Entry::Vacant(v) => {
                 v.insert(Writable::Page(content));
                 Ok(())
             }
-            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(path))),
+            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(o.key().clone()))),
         }
     }
 
@@ -182,7 +207,13 @@ impl RenderedSite {
         path: Url,
         content: content::IncludedPath,
     ) -> crate::Result<()> {
-        Ok(())
+        match self.writables.entry(path) {
+            Entry::Vacant(v) => {
+                v.insert(Writable::Asset(IncludedAsset(content.into())));
+                Ok(())
+            }
+            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(o.key().clone()))),
+        }
     }
 }
 
