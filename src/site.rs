@@ -104,7 +104,7 @@ impl<'env> Donter<'env> {
             .get_template(&page.meta.tpl_name)
             .map_err(|e| Box::new(e))?;
 
-        let mut ctx = jinja::RenderContext::new(minijinja::context! {page => &page });
+        let mut ctx = jinja::RenderContext::new(minijinja::context! {page => page });
         for processor in self.processors.iter_mut() {
             processor.page_render(&page, &mut ctx)?;
         }
@@ -276,5 +276,23 @@ pub trait Processor {
 }
 
 pub trait Writer {
-    fn write(&mut self, site: RenderedSite) -> crate::Result<()>;
+    fn write(&mut self, site: RenderedSite) -> crate::Result<()> {
+        use Writable::*;
+
+        for (url, writable) in site.entries() {
+            match writable {
+                Page(page) => self.write_rendered_page(url, page)?,
+                Asset(asset) => self.write_static_asset(url, asset)?,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn flush(self: Box<Self>) -> crate::Result<()> {
+        Ok(())
+    }
+
+    fn write_rendered_page(&mut self, url: Url, page: RenderedPage) -> crate::Result<()>;
+    fn write_static_asset(&mut self, url: Url, asset: IncludedAsset) -> crate::Result<()>;
 }

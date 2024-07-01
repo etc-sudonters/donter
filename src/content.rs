@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::Path;
 
-pub struct PageToken(u64);
+pub struct PageToken;
 
 #[derive(Debug, serde::Serialize)]
 pub struct Tag(String);
@@ -14,7 +14,6 @@ pub struct PageBuilder {
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
     pub(crate) url_path: Option<Url>,
-    pub(crate) tags: Vec<Tag>,
     pub(crate) notes: Option<Definitions<doctree::FootnoteDefinition>>,
     pub(crate) page_hrefs: Option<Definitions<doctree::HrefDefinition>>,
     pub(crate) when: Option<Date>,
@@ -28,7 +27,6 @@ impl PageBuilder {
             contents: Default::default(),
             filepath: f.into(),
             url_path: Default::default(),
-            tags: Default::default(),
             notes: Default::default(),
             page_hrefs: Default::default(),
             when: Default::default(),
@@ -37,16 +35,13 @@ impl PageBuilder {
         }
     }
 
-    pub fn tags<I: IntoIterator<Item = Tag>>(&mut self, i: I) -> &mut Self {
-        self.tags.extend(i.into_iter());
-        self
-    }
-
+    #[allow(dead_code)]
     pub fn written(&mut self, d: Date) -> &mut Self {
         self.when = Some(d);
         self
     }
 
+    #[allow(dead_code)]
     pub fn status(&mut self, s: PageStatus) -> &mut Self {
         self.page_status = s;
         self
@@ -57,6 +52,7 @@ impl PageBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn url(&mut self, d: Url) -> &mut Self {
         self.url_path = Some(d);
         self
@@ -73,7 +69,7 @@ impl PageBuilder {
     where
         F: FnOnce(&mut Definitions<doctree::FootnoteDefinition>),
     {
-        let mut footnotes = self.notes.get_or_insert_with(Default::default);
+        let footnotes = self.notes.get_or_insert_with(Default::default);
         f(footnotes);
         self
     }
@@ -82,7 +78,7 @@ impl PageBuilder {
     where
         F: FnOnce(&mut Definitions<doctree::HrefDefinition>),
     {
-        let mut hrefs = self.page_hrefs.get_or_insert_with(Default::default);
+        let hrefs = self.page_hrefs.get_or_insert_with(Default::default);
         f(hrefs);
         self
     }
@@ -153,12 +149,6 @@ impl<T: doctree::Definition> Default for Definitions<T> {
 }
 
 impl<T: doctree::Definition> Definitions<T> {
-    pub fn gather(&mut self, definitions: Vec<T>) {
-        for definition in definitions.into_iter() {
-            self.define(&definition.label(), definition);
-        }
-    }
-
     pub fn add_label(&mut self, key: &String) {
         self.get_or_insert(key);
     }
@@ -216,7 +206,10 @@ impl Corpus {
         self.pages.push(p);
     }
 
-    pub fn include_asset(&mut self, p: files::Path) {}
+    #[allow(dead_code, unused_variables)]
+    pub fn include_asset(&mut self, p: files::Path) {
+        todo!();
+    }
 
     pub fn entries(self) -> CorpusEntries {
         let (pages, included) = (self.pages, self.included);

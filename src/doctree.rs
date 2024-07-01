@@ -3,7 +3,6 @@ use std::fmt::Debug;
 #[derive(Debug, serde::Serialize)]
 pub enum Element {
     BlockQuote(Group),
-    Break,
     CodeBlock(Code),
     Delete(Group),
     Emphasis(Group),
@@ -19,55 +18,31 @@ pub enum Element {
     Strong(Group),
     Table(Table),
     Text(Text),
-    ThematicBreak,
 }
 
 #[derive(Debug, serde::Serialize)]
-pub struct List(Vec<ListItem>, ListStyle);
-
-impl List {
-    pub fn style(&mut self, style: ListStyle) {
-        self.1 = style;
-    }
-}
-
-#[derive(Debug, serde::Serialize)]
-pub enum ListStyle {
-    Ordered,
-    Unordered,
+pub struct List {
+    items: Vec<ListItem>,
 }
 
 impl Default for List {
     fn default() -> Self {
-        List(vec![], ListStyle::Unordered)
+        List { items: vec![] }
     }
 }
 
 impl List {
     pub fn push(&mut self, item: ListItem) {
-        self.0.push(item);
+        self.items.push(item);
     }
 }
 
 #[derive(Debug, serde::Serialize)]
-pub struct ListItem(Group, ItemStyle);
-
-#[derive(Debug, serde::Serialize)]
-pub enum ItemStyle {
-    Checked,
-    Unchecked,
-    Plain,
-}
+pub struct ListItem(Group);
 
 impl From<Group> for ListItem {
     fn from(value: Group) -> Self {
-        ListItem(value, ItemStyle::Plain)
-    }
-}
-
-impl ListItem {
-    pub fn style(&mut self, style: ItemStyle) {
-        self.1 = style;
+        ListItem(value)
     }
 }
 
@@ -184,16 +159,6 @@ pub struct Link {
     href: String,
     content: Box<Element>,
     title: Option<String>,
-}
-
-impl Link {
-    pub fn create(href: String, content: Element, title: Option<String>) -> Self {
-        Self {
-            href,
-            content: Box::new(content),
-            title,
-        }
-    }
 }
 
 #[derive(Debug, serde::Serialize)]

@@ -1,5 +1,5 @@
-{{ page.filename | safe }}
+{{ page.meta.origin | safe }}
 
-{% if page.footnotes %}
+{% if page.content.footnotes %}
 this page has footnotes!
 {% endif %}

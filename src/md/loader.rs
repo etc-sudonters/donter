@@ -36,8 +36,7 @@ impl site::Loader for Loader {
             ..markdown::ParseOptions::gfm()
         };
 
-        let node = markdown::to_mdast(&buf, &markdown::ParseOptions::gfm())
-            .map_err(|e| Error::ParseError(e))?;
+        let node = markdown::to_mdast(&buf, &opts).map_err(|e| Error::ParseError(e))?;
         MarkdownPageBuilder::new(builder).build(&node)
     }
 }

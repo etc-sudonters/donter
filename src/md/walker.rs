@@ -229,10 +229,10 @@ impl<'p> MarkdownPageBuilder<'p> {
         Ok(())
     }
 
-    fn table(&mut self, tbl: &markdown::mdast::Table) -> crate::Result<()> {
+    fn table(&mut self, md_table: &markdown::mdast::Table) -> crate::Result<()> {
         use markdown::mdast::Node;
         let mut table = doctree::Table::new();
-        for node in tbl.children.iter() {
+        for node in md_table.children.iter() {
             match node {
                 Node::TableRow(row) => {
                     self.table_row(&mut table, row)?;
@@ -242,26 +242,28 @@ impl<'p> MarkdownPageBuilder<'p> {
                 }
             }
         }
+        self.push_element(doctree::Element::Table(table));
         Ok(())
     }
 
     fn table_row(
         &mut self,
         tbl: &mut doctree::Table,
-        row: &markdown::mdast::TableRow,
+        md_row: &markdown::mdast::TableRow,
     ) -> crate::Result<()> {
         use markdown::mdast::Node;
-        let mut table_row = doctree::TableRow::new();
-        for node in row.children.iter() {
+        let mut row = doctree::TableRow::new();
+        for node in md_row.children.iter() {
             match node {
                 Node::TableCell(cell) => {
-                    self.table_cell(&mut table_row, cell)?;
+                    self.table_cell(&mut row, cell)?;
                 }
                 any @ _ => {
                     return Error::Unexpected(format!("Unexpected element: {:?}", any)).into()
                 }
             }
         }
+        tbl.push(row);
         Ok(())
     }
 

@@ -1,4 +1,4 @@
-use std::{fmt::Display, path};
+use std::{fmt::Display, ops::Deref, path};
 
 pub enum RecursionBehavior {
     Recurse,
@@ -28,12 +28,7 @@ impl<'a> IntoIterator for Walker<'a> {
     }
 }
 
-pub enum PathKind {
-    File,
-    Dir,
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Path {
     File(FilePath),
     Dir(DirPath),
@@ -49,7 +44,7 @@ impl AsRef<path::Path> for Path {
     }
 }
 
-impl PathKind {
+impl Path {
     pub fn impose(p: path::PathBuf) -> Option<Path> {
         if p.is_file() {
             Some(Path::File(FilePath(p)))
@@ -63,6 +58,13 @@ impl PathKind {
 
 #[derive(Debug, Clone)]
 pub struct FilePath(path::PathBuf);
+
+impl Deref for FilePath {
+    type Target = path::PathBuf;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl FilePath {
     pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> FilePath {
@@ -107,6 +109,10 @@ pub struct DirPath(path::PathBuf);
 impl DirPath {
     pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> DirPath {
         DirPath(p.into())
+    }
+
+    pub fn join<P: AsRef<path::Path>>(&self, path: P) -> path::PathBuf {
+        self.0.join(path)
     }
 }
 
@@ -165,7 +171,7 @@ impl BreadthFirstWalker {
                     Ok(e) => e,
                 };
 
-                match PathKind::impose(entry.path()) {
+                match Path::impose(entry.path()) {
                     Some(p) => match p {
                         Path::File(f) => self.files.push(f),
                         Path::Dir(d) => self.dirs.push(d),
