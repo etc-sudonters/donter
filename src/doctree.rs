@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Element {
     BlockQuote(Group),
     CodeBlock(Code),
@@ -20,7 +20,7 @@ pub enum Element {
     Text(Text),
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct List {
     items: Vec<ListItem>,
 }
@@ -37,7 +37,7 @@ impl List {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ListItem(Group);
 
 impl From<Group> for ListItem {
@@ -46,27 +46,35 @@ impl From<Group> for ListItem {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Group {
-    children: Vec<Element>,
+    kids: Vec<Element>,
 }
 
 impl Default for Group {
     fn default() -> Self {
-        Self {
-            children: Vec::new(),
-        }
+        Self { kids: Vec::new() }
     }
 }
 
 impl Group {
     pub fn push(&mut self, elm: Element) {
-        self.children.push(elm)
+        self.kids.push(elm)
+    }
+
+    pub fn children(&self) -> &Vec<Element> {
+        &self.kids
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CodeLiteral(String);
+
+impl CodeLiteral {
+    pub fn lines(&self) -> impl Iterator<Item = &str> {
+        self.0.lines().into_iter()
+    }
+}
 
 impl From<String> for CodeLiteral {
     fn from(value: String) -> Self {
@@ -74,7 +82,7 @@ impl From<String> for CodeLiteral {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CodeLanguage(String);
 
 impl From<String> for CodeLanguage {
@@ -83,24 +91,46 @@ impl From<String> for CodeLanguage {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Code {
     code: CodeLiteral,
     lang: Option<CodeLanguage>,
     // freeform string -- it's not of use here but transformers may want it
-    meta: Option<String>,
+    metadata: Option<String>,
 }
 
 impl Code {
-    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>, meta: Option<String>) -> Code {
-        Code { code, lang, meta }
+    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>, metadata: Option<String>) -> Code {
+        Code {
+            code,
+            lang,
+            metadata,
+        }
+    }
+
+    pub fn lang(&self) -> &Option<CodeLanguage> {
+        &self.lang
+    }
+
+    pub fn content(&self) -> &CodeLiteral {
+        &self.code
+    }
+
+    pub fn meta(&self) -> &Option<String> {
+        &self.metadata
+    }
+}
+
+impl Display for CodeLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
 impl FromIterator<Element> for Group {
     fn from_iter<T: IntoIterator<Item = Element>>(iter: T) -> Self {
         Group {
-            children: iter.into_iter().collect(),
+            kids: iter.into_iter().collect(),
         }
     }
 }
@@ -109,22 +139,22 @@ impl From<Element> for Group {
     fn from(value: Element) -> Self {
         match value {
             Element::Group(g) => g,
-            v @ _ => Group { children: vec![v] },
+            v @ _ => Group { kids: vec![v] },
         }
     }
 }
 
 impl From<Group> for Element {
     fn from(mut value: Group) -> Self {
-        match value.children.len() {
+        match value.kids.len() {
             0 => Element::Empty,
-            1 => value.children.remove(0),
+            1 => value.kids.remove(0),
             _ => Element::Group(value),
         }
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Header {
     depth: u8,
     children: Box<Element>,
@@ -139,7 +169,7 @@ impl Header {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Text(String);
 
 impl Text {
@@ -154,14 +184,14 @@ impl Debug for Text {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Link {
     href: String,
     content: Box<Element>,
     title: Option<String>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct HrefDefinition {
     id: String,
     href: String,
@@ -173,7 +203,7 @@ impl HrefDefinition {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct HrefReference {
     content: Box<Element>,
     id: String,
@@ -190,7 +220,7 @@ impl HrefReference {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Image {
     alt: String,
     href: String,
@@ -202,7 +232,7 @@ impl Image {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ImageReference {
     href: String,
     alt: String,
@@ -214,7 +244,7 @@ impl ImageReference {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Table {
     rows: Vec<TableRow>,
 }
@@ -231,7 +261,7 @@ impl Table {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TableRow {
     cells: Vec<TableCell>,
 }
@@ -246,7 +276,7 @@ impl TableRow {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TableCell(Box<Element>);
 
 impl TableCell {
@@ -255,7 +285,7 @@ impl TableCell {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FootnoteReference(String);
 
 impl FootnoteReference {
@@ -276,7 +306,7 @@ impl From<FootnoteReference> for Element {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FootnoteDefinition {
     id: String,
     content: Box<Element>,

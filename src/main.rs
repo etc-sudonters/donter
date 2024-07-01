@@ -6,6 +6,7 @@ mod files;
 mod jinja;
 mod md;
 mod processors;
+mod render;
 mod site;
 mod writers;
 

@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub struct PageToken;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Tag(String);
 
 pub struct PageBuilder {
@@ -101,13 +101,13 @@ impl PageBuilder {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Page {
     pub(crate) meta: PageMetadata,
     pub(crate) content: PageContents,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PageMetadata {
     pub(crate) origin: Origin,
     pub(crate) url: Url,
@@ -116,23 +116,23 @@ pub struct PageMetadata {
     pub(crate) tpl_name: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Date(String);
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum PageStatus {
     Published,
     Draft,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PageContents {
-    content: Vec<doctree::Element>,
+    pub(crate) content: Vec<doctree::Element>,
     pub(crate) footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
-    hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    pub(crate) hrefs: Option<Definitions<doctree::HrefDefinition>>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Definitions<T: doctree::Definition> {
     labels: Vec<String>,
     // label idx -> definition
@@ -275,5 +275,14 @@ impl serde::Serialize for Origin {
         S: serde::Serializer,
     {
         serializer.serialize_str(self.0.as_path().to_str().unwrap())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Origin {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
     }
 }
