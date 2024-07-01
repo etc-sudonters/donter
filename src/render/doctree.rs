@@ -1,7 +1,10 @@
 use minijinja::value::ViaDeserialize;
 
 use super::{CodeHighlighter, DisplayableOption, NullHighligher};
-use crate::{content, doctree};
+use crate::{
+    content,
+    doctree::{self, DefinitionLookup},
+};
 
 pub fn render_page(page: ViaDeserialize<content::PageContents>) -> String {
     let mut buffer = String::new();
@@ -51,10 +54,20 @@ impl<'a> DoctreeRenderer<'a> {
         }
     }
 
+    fn wrap_children(
+        &self,
+        open: &str,
+        children: &doctree::Group,
+        close: &str,
+        buffer: &mut String,
+    ) {
+        buffer.push_str(open);
+        self.render_elms(children.children(), buffer);
+        buffer.push_str(close);
+    }
+
     fn blockquote(&self, q: &doctree::Group, buffer: &mut String) {
-        buffer.push_str("<blockquote>\n");
-        self.render_elms(q.children(), buffer);
-        buffer.push_str("</blockquote>\n");
+        self.wrap_children("<blockquote>", q, "</blockquote>", buffer);
     }
 
     fn codeblock(&self, c: &doctree::Code, buffer: &mut String) {
@@ -74,22 +87,40 @@ impl<'a> DoctreeRenderer<'a> {
     }
 
     fn delete(&self, d: &doctree::Group, buffer: &mut String) {
-        todo!()
+        self.wrap_children("<s>", d, "</s>", buffer);
     }
     fn emphasis(&self, d: &doctree::Group, buffer: &mut String) {
-        todo!()
+        self.wrap_children("<em>", d, "</em>", buffer);
     }
     fn footnote_reference(&self, f: &doctree::FootnoteReference, buffer: &mut String) {
-        todo!()
+        buffer.push_str(
+            format!(
+                "<span class=\"footnote reference\"><a href=\"#{0}\">{0}</a></span>",
+                f
+            )
+            .as_str(),
+        );
     }
     fn heading(&self, d: &doctree::Header, buffer: &mut String) {
-        todo!()
+        self.wrap_children(
+            format!("<h{}>", d.depth()).as_str(),
+            d.children(),
+            format!("</h{}>", d.depth()).as_str(),
+            buffer,
+        );
     }
     fn href_reference(&self, d: &doctree::HrefReference, buffer: &mut String) {
-        todo!()
+        let def = self.page.hrefs.lookup(d).unwrap();
+        self.wrap_children(
+            format!("<a href=\"{}\">", def.href()).as_str(),
+            d.children(),
+            "</a>",
+            buffer,
+        );
     }
     fn image_reference(&self, d: &doctree::ImageReference, buffer: &mut String) {
-        todo!()
+        let def = self.page.hrefs.lookup(d).unwrap();
+        buffer.push_str(format!("<img href=\"{}\" />", def.href()).as_str());
     }
     fn inline_code(&self, d: &doctree::Code, buffer: &mut String) {
         todo!()

@@ -14,8 +14,8 @@ pub struct PageBuilder {
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
     pub(crate) url_path: Option<Url>,
-    pub(crate) notes: Option<Definitions<doctree::FootnoteDefinition>>,
-    pub(crate) page_hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    pub(crate) notes: Definitions<doctree::FootnoteDefinition>,
+    pub(crate) page_hrefs: Definitions<doctree::HrefDefinition>,
     pub(crate) when: Option<Date>,
     pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
@@ -69,8 +69,7 @@ impl PageBuilder {
     where
         F: FnOnce(&mut Definitions<doctree::FootnoteDefinition>),
     {
-        let footnotes = self.notes.get_or_insert_with(Default::default);
-        f(footnotes);
+        f(&mut self.notes);
         self
     }
 
@@ -78,8 +77,7 @@ impl PageBuilder {
     where
         F: FnOnce(&mut Definitions<doctree::HrefDefinition>),
     {
-        let hrefs = self.page_hrefs.get_or_insert_with(Default::default);
-        f(hrefs);
+        f(&mut self.page_hrefs);
         self
     }
 
@@ -128,8 +126,8 @@ pub enum PageStatus {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PageContents {
     pub(crate) content: Vec<doctree::Element>,
-    pub(crate) footnotes: Option<Definitions<doctree::FootnoteDefinition>>,
-    pub(crate) hrefs: Option<Definitions<doctree::HrefDefinition>>,
+    pub(crate) footnotes: Definitions<doctree::FootnoteDefinition>,
+    pub(crate) hrefs: Definitions<doctree::HrefDefinition>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -137,6 +135,15 @@ pub struct Definitions<T: doctree::Definition> {
     labels: Vec<String>,
     // label idx -> definition
     definitions: HashMap<usize, T>,
+}
+
+impl<R: doctree::Reference, T: doctree::Definition> doctree::DefinitionLookup<R, T>
+    for Definitions<T>
+{
+    fn lookup(&self, id: R) -> Option<&T> {
+        let id = self.labels.iter().enumerate().find(|&x| x.1 == id.label());
+        id.map(|x| self.definitions.get(&x.0)).flatten()
+    }
 }
 
 impl<T: doctree::Definition> Default for Definitions<T> {

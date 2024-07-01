@@ -1,4 +1,6 @@
-use std::fmt::{Debug, Display};
+use std::fmt::{write, Debug, Display};
+
+use url::Url;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Element {
@@ -157,15 +159,23 @@ impl From<Group> for Element {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Header {
     depth: u8,
-    children: Box<Element>,
+    group: Group,
 }
 
 impl Header {
-    pub fn create(depth: u8, children: Element) -> Self {
+    pub fn create(depth: u8, children: Group) -> Self {
         Header {
             depth,
-            children: Box::new(children),
+            group: children,
         }
+    }
+
+    pub fn depth(&self) -> u8 {
+        self.depth
+    }
+
+    pub fn children(&self) -> &Group {
+        &self.group
     }
 }
 
@@ -194,29 +204,37 @@ pub struct Link {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct HrefDefinition {
     id: String,
-    href: String,
+    href_: String,
 }
 
 impl HrefDefinition {
     pub fn create(id: String, href: String) -> Self {
-        Self { id, href }
+        Self { id, href_: href }
+    }
+
+    pub fn href(&self) -> &String {
+        &self.href_
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct HrefReference {
-    content: Box<Element>,
+    content: Group,
     id: String,
     title: Option<String>,
 }
 
 impl HrefReference {
-    pub fn create(id: String, content: Element, title: Option<String>) -> Self {
-        Self {
-            content: Box::new(content),
-            id,
-            title,
-        }
+    pub fn create(id: String, content: Group, title: Option<String>) -> Self {
+        Self { content, id, title }
+    }
+
+    pub fn hrefid(&self) -> &String {
+        &self.id
+    }
+
+    pub fn children(&self) -> &Group {
+        &self.content
     }
 }
 
@@ -288,9 +306,9 @@ impl TableCell {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FootnoteReference(String);
 
-impl FootnoteReference {
-    pub fn create(id: String) -> Self {
-        Self(id)
+impl Display for FootnoteReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -325,6 +343,7 @@ impl FootnoteDefinition {
 pub trait Definition {
     fn label(&self) -> String;
 }
+
 impl Definition for FootnoteDefinition {
     fn label(&self) -> String {
         self.id.clone()
@@ -334,6 +353,36 @@ impl Definition for HrefDefinition {
     fn label(&self) -> String {
         self.id.clone()
     }
+}
+
+pub trait Reference {
+    fn label(&self) -> &String;
+}
+
+impl Reference for &HrefReference {
+    fn label(&self) -> &String {
+        &self.id
+    }
+}
+
+impl Reference for &ImageReference {
+    fn label(&self) -> &String {
+        &self.href
+    }
+}
+
+impl Reference for &FootnoteReference {
+    fn label(&self) -> &String {
+        &self.0
+    }
+}
+
+pub trait DefinitionLookup<R, T>
+where
+    T: Definition,
+    R: Reference,
+{
+    fn lookup(&self, reference: R) -> Option<&T>;
 }
 
 impl Code {
