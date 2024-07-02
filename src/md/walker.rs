@@ -1,5 +1,5 @@
 use super::Error;
-use crate::{content, doctree};
+use crate::{content, content::doctree};
 
 pub struct MarkdownPageBuilder<'p> {
     groups: Vec<doctree::Group>,
@@ -71,7 +71,8 @@ impl<'p> MarkdownPageBuilder<'p> {
     fn walk(&mut self, node: &markdown::mdast::Node) -> crate::Result<()> {
         use markdown::mdast::Node;
         match node {
-            Node::Root(r) => Error::Unexpected("Unexpected nested root element".to_owned()).into(),
+            Node::Yaml(_) => Ok(()),
+            Node::Root(_) => Error::Unexpected("Unexpected nested root element".to_owned()).into(),
             Node::BlockQuote(quote) => self.blockquote(quote),
             Node::Code(block) => self.codeblock(block),
             Node::Definition(def) => self.href_definition(def),
@@ -99,8 +100,7 @@ impl<'p> MarkdownPageBuilder<'p> {
         // TODO get rid of clones -- mem::replace would be nice if possible
         let content = doctree::CodeLiteral::from(code.value.clone());
         let lang = code.lang.clone().map(|l| doctree::CodeLanguage::from(l));
-        let meta = code.meta.clone();
-        self.push_element(doctree::Code::new(content, lang, meta).block());
+        self.push_element(doctree::Code::new(content, lang).block());
         Ok(())
     }
 
@@ -173,7 +173,6 @@ impl<'p> MarkdownPageBuilder<'p> {
     fn inline_code(&mut self, code: &markdown::mdast::InlineCode) -> crate::Result<()> {
         self.push_element(doctree::Element::InlineCode(doctree::Code::new(
             doctree::CodeLiteral::from(code.value.clone()),
-            None,
             None,
         )));
         Ok(())

@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Read, mem};
+use std::{io::Read, mem};
 
 use minijinja;
 
@@ -72,11 +72,6 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    pub fn add<S: serde::ser::Serialize>(&mut self, key: String, value: S) -> &Self {
-        self.ctx = minijinja::context!( key => value, ..self.take());
-        self
-    }
-
     pub fn merge(&mut self, merge: minijinja::Value) -> &Self {
         self.ctx = minijinja::context!(..merge, ..self.take());
         self
@@ -103,19 +98,3 @@ impl serde::ser::Serialize for RenderContext {
         self.ctx.serialize(serializer)
     }
 }
-
-#[derive(Debug)]
-pub enum Error {
-    Render(minijinja::Error),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "jinja::Error::")?;
-        match self {
-            Self::Render(j) => write!(f, "Render({})", j),
-        }
-    }
-}
-
-impl std::error::Error for Error {}

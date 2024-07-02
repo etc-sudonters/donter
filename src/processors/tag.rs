@@ -4,9 +4,10 @@ use crate::{content, site};
 
 pub struct TagToken(u64);
 
-pub struct Tags {
-    entries: HashMap<TagToken, Vec<content::PageToken>>,
-}
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Tag(String);
+
+pub struct Tags;
 
 impl site::Processor for Tags {
     fn initialize<'init, 'site>(

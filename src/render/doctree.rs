@@ -1,12 +1,10 @@
-use minijinja::value::ViaDeserialize;
-
 use super::{CodeHighlighter, DisplayableOption, NullHighligher};
 use crate::{
     content,
-    doctree::{self, DefinitionLookup},
+    content::doctree::{self, Definition, DefinitionLookup},
 };
 
-pub fn render_page(page: ViaDeserialize<content::PageContents>) -> String {
+pub fn render_page(page: &content::PageContents) -> String {
     let mut buffer = String::new();
     let helper = DoctreeRenderer {
         page: &page,
@@ -23,7 +21,24 @@ struct DoctreeRenderer<'a> {
 
 impl<'a> DoctreeRenderer<'a> {
     pub fn render(&self, buffer: &mut String) {
-        self.render_elms(&self.page.content, buffer)
+        self.render_elms(&self.page.content, buffer);
+        self.include_footnotes(buffer);
+    }
+
+    fn include_footnotes(&self, buffer: &mut String) {
+        buffer.push_str("<div class=\"footnotes\">\n");
+        buffer.push_str("<ol>\n");
+        for ftn in self.page.footnotes.definitions() {
+            self.wrap_children(
+                format!("<li id=\"{}\">\n", ftn.label()).as_str(),
+                ftn.children(),
+                "</li>\n",
+                buffer,
+            );
+        }
+
+        buffer.push_str("</ol>\n");
+        buffer.push_str("</div>\n");
     }
 
     fn render_elms(&self, elms: &Vec<doctree::Element>, buffer: &mut String) {
@@ -122,22 +137,46 @@ impl<'a> DoctreeRenderer<'a> {
         let def = self.page.hrefs.lookup(d).unwrap();
         buffer.push_str(format!("<img href=\"{}\" />", def.href()).as_str());
     }
+
     fn inline_code(&self, d: &doctree::Code, buffer: &mut String) {
-        todo!()
+        buffer.push_str(format!("<span class=\"code inline\"><code>").as_str());
+        buffer.push_str(d.content().str());
+        buffer.push_str("</code></span>");
     }
+
     fn list(&self, d: &doctree::List, buffer: &mut String) {
-        todo!()
+        buffer.push_str("<ul>");
+        for item in d.items() {
+            self.wrap_children("<li>", item.children(), "</li>", buffer);
+        }
+        buffer.push_str("</ul>");
     }
+
     fn paragraph(&self, d: &doctree::Group, buffer: &mut String) {
-        todo!()
+        self.wrap_children("<p>", d, "</p>", buffer)
     }
+
     fn strong(&self, d: &doctree::Group, buffer: &mut String) {
-        todo!()
+        self.wrap_children("<strong>", d, "</strong>", buffer)
     }
+
     fn table(&self, d: &doctree::Table, buffer: &mut String) {
-        todo!()
+        buffer.push_str("<table>");
+
+        for row in d.rows() {
+            buffer.push_str("<tr>");
+
+            for cell in row.cells() {
+                self.wrap_children("<td>", cell.children(), "</td>", buffer);
+            }
+
+            buffer.push_str("</tr>");
+        }
+
+        buffer.push_str("</table>");
     }
+
     fn text(&self, d: &doctree::Text, buffer: &mut String) {
-        todo!()
+        buffer.push_str(d.str());
     }
 }

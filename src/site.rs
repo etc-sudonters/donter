@@ -6,7 +6,7 @@ use std::{
 
 use url::Url;
 
-use crate::{content, files, jinja, Result};
+use crate::{content, files, jinja, render::render_page, Result};
 
 pub struct Builder(Vec<Box<dyn Processor>>);
 
@@ -104,7 +104,9 @@ impl<'env> Donter<'env> {
             .get_template(&page.meta.tpl_name)
             .map_err(|e| Box::new(e))?;
 
-        let mut ctx = jinja::RenderContext::new(minijinja::context! {page => page });
+        let mut ctx = jinja::RenderContext::new(
+            minijinja::context! {page => minijinja::Value::from_safe_string(render_page(&page.content)) },
+        );
         for processor in self.processors.iter_mut() {
             processor.page_render(&page, &mut ctx)?;
         }
@@ -262,7 +264,7 @@ pub trait Processor {
         Ok(())
     }
 
-    fn page_render(&mut self, page: &content::Page, ctx: &mut jinja::RenderContext) -> Result<()> {
+    fn page_render(&mut self, page: &content::Page, tx: &mut jinja::RenderContext) -> Result<()> {
         Ok(())
     }
 

@@ -1,6 +1,4 @@
-use std::fmt::{write, Debug, Display};
-
-use url::Url;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Element {
@@ -24,23 +22,33 @@ pub enum Element {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct List {
-    items: Vec<ListItem>,
+    li: Vec<ListItem>,
 }
 
 impl Default for List {
     fn default() -> Self {
-        List { items: vec![] }
+        List { li: vec![] }
     }
 }
 
 impl List {
     pub fn push(&mut self, item: ListItem) {
-        self.items.push(item);
+        self.li.push(item);
+    }
+
+    pub fn items(&self) -> impl Iterator<Item = &ListItem> {
+        self.li.iter()
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ListItem(Group);
+
+impl ListItem {
+    pub fn children(&self) -> &Group {
+        &self.0
+    }
+}
 
 impl From<Group> for ListItem {
     fn from(value: Group) -> Self {
@@ -76,6 +84,10 @@ impl CodeLiteral {
     pub fn lines(&self) -> impl Iterator<Item = &str> {
         self.0.lines().into_iter()
     }
+
+    pub fn str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
 impl From<String> for CodeLiteral {
@@ -97,17 +109,11 @@ impl From<String> for CodeLanguage {
 pub struct Code {
     code: CodeLiteral,
     lang: Option<CodeLanguage>,
-    // freeform string -- it's not of use here but transformers may want it
-    metadata: Option<String>,
 }
 
 impl Code {
-    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>, metadata: Option<String>) -> Code {
-        Code {
-            code,
-            lang,
-            metadata,
-        }
+    pub fn new(code: CodeLiteral, lang: Option<CodeLanguage>) -> Code {
+        Code { code, lang }
     }
 
     pub fn lang(&self) -> &Option<CodeLanguage> {
@@ -116,10 +122,6 @@ impl Code {
 
     pub fn content(&self) -> &CodeLiteral {
         &self.code
-    }
-
-    pub fn meta(&self) -> &Option<String> {
-        &self.metadata
     }
 }
 
@@ -186,6 +188,10 @@ impl Text {
     pub fn create(s: String) -> Text {
         Text(s)
     }
+
+    pub fn str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Debug for Text {
@@ -229,10 +235,6 @@ impl HrefReference {
         Self { content, id, title }
     }
 
-    pub fn hrefid(&self) -> &String {
-        &self.id
-    }
-
     pub fn children(&self) -> &Group {
         &self.content
     }
@@ -242,12 +244,6 @@ impl HrefReference {
 pub struct Image {
     alt: String,
     href: String,
-}
-
-impl Image {
-    pub fn create(href: String, alt: String) -> Self {
-        Self { alt, href }
-    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -264,42 +260,54 @@ impl ImageReference {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Table {
-    rows: Vec<TableRow>,
+    r: Vec<TableRow>,
 }
 
 impl Table {
     pub fn new() -> Table {
         Self {
-            rows: Default::default(),
+            r: Default::default(),
         }
     }
 
     pub fn push(&mut self, row: TableRow) {
-        self.rows.push(row);
+        self.r.push(row);
+    }
+
+    pub fn rows(&self) -> impl Iterator<Item = &TableRow> {
+        self.r.iter()
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TableRow {
-    cells: Vec<TableCell>,
+    c: Vec<TableCell>,
 }
 
 impl TableRow {
     pub fn new() -> TableRow {
-        Self { cells: vec![] }
+        Self { c: vec![] }
     }
 
     pub fn push(&mut self, cell: TableCell) {
-        self.cells.push(cell);
+        self.c.push(cell);
+    }
+
+    pub fn cells(&self) -> impl Iterator<Item = &TableCell> {
+        self.c.iter()
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct TableCell(Box<Element>);
+pub struct TableCell(Group);
 
 impl TableCell {
-    pub fn create(elm: Element) -> Self {
-        Self(Box::new(elm))
+    pub fn create(g: Group) -> Self {
+        Self(g)
+    }
+
+    pub fn children(&self) -> &Group {
+        &self.0
     }
 }
 
@@ -327,15 +335,19 @@ impl From<FootnoteReference> for Element {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FootnoteDefinition {
     id: String,
-    content: Box<Element>,
+    content: Group,
 }
 
 impl FootnoteDefinition {
-    pub fn create<E: Into<Element>>(id: String, content: E) -> Self {
+    pub fn create<G: Into<Group>>(id: String, content: G) -> Self {
         Self {
             id,
-            content: Box::new(content.into()),
+            content: content.into(),
         }
+    }
+
+    pub fn children(&self) -> &Group {
+        &self.content
     }
 }
 
@@ -388,9 +400,5 @@ where
 impl Code {
     pub fn block(self) -> Element {
         Element::CodeBlock(self)
-    }
-
-    pub fn inline(self) -> Element {
-        Element::InlineCode(self)
     }
 }

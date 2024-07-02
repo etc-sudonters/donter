@@ -48,8 +48,15 @@ impl Linker {
         let path = std::fs::canonicalize(origin).expect("could not canonicalize origin");
         let path = path
             .strip_prefix(&self.opts.content_base)
-            .expect("could not strip content base");
-        let url = self.opts.site_base.join(path.to_str().unwrap());
+            .expect("could not strip content base")
+            .to_str()
+            .unwrap();
+        let ext = origin.extension().unwrap().to_string_lossy().to_string();
+
+        let url = self
+            .opts
+            .site_base
+            .join(path.replace(ext.as_str(), "html").as_str());
         println!("converted origin to: {:?} and {:?}", path, url);
         url.unwrap()
     }

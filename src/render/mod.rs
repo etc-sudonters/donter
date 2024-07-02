@@ -3,26 +3,8 @@ mod highlight;
 use std::fmt::Display;
 
 use crate::site;
-use doctree::render_page;
+pub use doctree::render_page;
 pub use highlight::{CodeHighlighter, NullHighligher};
-
-pub struct DefaultFunctions;
-impl site::Processor for DefaultFunctions {
-    fn initialize<'call, 'init>(
-        &'call mut self,
-        site: &'call mut site::Initializer<'init, '_>,
-    ) -> crate::Result<()>
-    where
-        'init: 'call,
-    {
-        site.configure_renderer(|r| {
-            r.configure(|env| {
-                env.add_function("render_page", render_page);
-                Ok(())
-            })
-        })
-    }
-}
 
 struct DisplayableOption<'a, T>
 where

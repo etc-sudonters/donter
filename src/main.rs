@@ -1,7 +1,7 @@
+#![allow(unused)]
 mod cli;
 mod config;
 mod content;
-mod doctree;
 mod files;
 mod jinja;
 mod md;
@@ -28,7 +28,7 @@ fn main() -> Result<()> {
         }))
         .create()?;
 
-    let mut corpus = content::default();
+    let mut corpus = content::Corpus::default();
 
     app.load(&conf.content.base(), &mut corpus)?;
     app.process(&mut corpus)?;
