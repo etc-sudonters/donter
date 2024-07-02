@@ -96,6 +96,12 @@ impl From<String> for CodeLiteral {
     }
 }
 
+impl AsRef<str> for CodeLiteral {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CodeLanguage(String);
 
@@ -188,9 +194,11 @@ impl Text {
     pub fn create(s: String) -> Text {
         Text(s)
     }
+}
 
-    pub fn str(&self) -> &str {
-        &self.0
+impl AsRef<str> for Text {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 
