@@ -114,12 +114,14 @@ impl<'env> Donter<'env> {
             .get_template(&page.meta.tpl_name)
             .map_err(|e| Box::new(e))?;
 
-        let mut ctx = jinja::RenderContext::new(
-            minijinja::context! {page => minijinja::Value::from_safe_string(render_page(&page.content)) },
-        );
+        let mut ctx = jinja::RenderContext::new(minijinja::Value::default());
         for processor in self.processors.iter_mut() {
             processor.page_render(&page, &mut ctx)?;
         }
+
+        ctx.merge(
+            minijinja::context! { page => minijinja::Value::from_safe_string(render_page(&page.content))},
+        );
 
         Ok(tpl
             .render(ctx)

@@ -13,8 +13,14 @@ pub use origin::Origin;
 pub use page::{Page, PageContents, PageMetadata, PageStatus};
 pub use pagebuilder::PageBuilder;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Date(String);
+
+impl Date {
+    pub fn new(when: String) -> Date {
+        Self(when)
+    }
+}
 
 #[derive(Debug)]
 pub enum Error {}

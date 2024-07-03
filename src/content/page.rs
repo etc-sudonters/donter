@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::files;
 
-use super::{doctree, Date, Definitions, Origin};
+use super::{doctree, Date, Definitions, Metadata, Origin};
 
 #[derive(Debug)]
 pub struct Page {
@@ -15,6 +17,7 @@ pub struct PageMetadata {
     pub(crate) when: Option<Date>,
     pub(crate) status: PageStatus,
     pub(crate) tpl_name: String,
+    pub(crate) meta: HashMap<String, Metadata>,
 }
 
 #[derive(Debug)]

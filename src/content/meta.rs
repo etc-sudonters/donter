@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub enum Metadata {
     List(Vec<Metadata>),
     Map(HashMap<String, Metadata>),

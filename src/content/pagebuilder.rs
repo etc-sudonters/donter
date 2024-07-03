@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use super::definitions::Definitions;
 use super::page::{Page, PageContents, PageMetadata, PageStatus};
-use super::Date;
 use super::{doctree, meta};
+use super::{Date, Metadata};
 use crate::files;
 
 pub struct PageBuilder {
@@ -14,7 +16,7 @@ pub struct PageBuilder {
     pub(crate) when: Option<Date>,
     pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
-    pub(crate) meta: Option<meta::Metadata>,
+    pub(crate) meta: HashMap<String, Metadata>,
 }
 
 impl PageBuilder {
@@ -31,6 +33,11 @@ impl PageBuilder {
             tpl_name: "page.html".to_owned(),
             meta: Default::default(),
         }
+    }
+
+    pub fn with_title<S: Into<String>>(&mut self, title: S) -> &mut Self {
+        self.title = title.into();
+        self
     }
 
     pub fn written(&mut self, d: Date) -> &mut Self {
@@ -84,6 +91,7 @@ impl PageBuilder {
                 when: self.when.take(),
                 status: self.page_status,
                 tpl_name: self.tpl_name,
+                meta: self.meta,
             },
             content: PageContents {
                 content: self.contents,
