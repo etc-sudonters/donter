@@ -32,6 +32,7 @@ pub struct Output {
     pub(crate) output: files::Path,
     pub(crate) slug_style: processors::ArticleSlugStyle,
     pub(crate) article_prefix: Option<String>,
+    pub(crate) clean: bool,
 }
 
 impl Output {

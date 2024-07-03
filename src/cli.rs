@@ -18,6 +18,8 @@ pub struct Args {
     article_prefix: Option<String>,
     #[arg(short = 'D', default_value_t = false)]
     write_directories: bool,
+    #[arg(long, default_value_t = true)]
+    clean: bool,
 }
 
 impl Args {
@@ -43,6 +45,7 @@ impl Args {
                     ArticleSlugStyle::Page
                 },
                 article_prefix: self.article_prefix.take(),
+                clean: self.clean,
             },
         }
     }
