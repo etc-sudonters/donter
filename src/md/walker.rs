@@ -1,5 +1,8 @@
 use super::Error;
-use crate::{content, content::doctree};
+use crate::{
+    content::{self, doctree},
+    md::frontmatter::frontmatter_to_page_meta,
+};
 
 pub struct MarkdownPageBuilder<'p> {
     groups: Vec<doctree::Group>,
@@ -71,7 +74,7 @@ impl<'p> MarkdownPageBuilder<'p> {
     fn walk(&mut self, node: &markdown::mdast::Node) -> crate::Result<()> {
         use markdown::mdast::Node;
         match node {
-            Node::Yaml(_) => Ok(()),
+            Node::Yaml(y) => frontmatter_to_page_meta(y, &mut self.builder),
             Node::Root(_) => Error::Unexpected("Unexpected nested root element".to_owned()).into(),
             Node::BlockQuote(quote) => self.blockquote(quote),
             Node::Code(block) => self.codeblock(block),

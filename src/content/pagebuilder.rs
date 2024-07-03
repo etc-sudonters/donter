@@ -1,10 +1,11 @@
 use super::definitions::Definitions;
-use super::doctree;
 use super::page::{Page, PageContents, PageMetadata, PageStatus};
 use super::Date;
+use super::{doctree, meta};
 use crate::files;
 
 pub struct PageBuilder {
+    pub(crate) title: String,
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
     pub(crate) url_path: Option<files::FilePath>,
@@ -13,11 +14,13 @@ pub struct PageBuilder {
     pub(crate) when: Option<Date>,
     pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
+    pub(crate) meta: Option<meta::Metadata>,
 }
 
 impl PageBuilder {
     pub fn new<F: Into<files::FilePath>>(f: F) -> PageBuilder {
         PageBuilder {
+            title: Default::default(),
             contents: Default::default(),
             filepath: f.into(),
             url_path: Default::default(),
@@ -26,6 +29,7 @@ impl PageBuilder {
             when: Default::default(),
             page_status: PageStatus::Published,
             tpl_name: "page.html".to_owned(),
+            meta: Default::default(),
         }
     }
 

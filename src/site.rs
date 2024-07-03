@@ -13,6 +13,18 @@ impl Builder {
         Self(vec![])
     }
 
+    pub fn with_when<F, P>(&mut self, cond: bool, factory: F) -> &mut Self
+    where
+        P: 'static + Processor,
+        F: FnOnce() -> P,
+    {
+        if cond {
+            self.with(factory());
+        }
+
+        self
+    }
+
     pub fn with<P: 'static + Processor>(&mut self, processor: P) -> &mut Self {
         self.0.push(Box::new(processor));
         self

@@ -1,3 +1,4 @@
+mod frontmatter;
 pub mod loader;
 mod walker;
 use crate::site;

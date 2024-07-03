@@ -30,10 +30,9 @@ impl Options {
     }
 }
 
-// knows the origin filepath and the generated URL, updates intrasite hrefs to
-// use these new URLs
 pub struct Linker {
     opts: Options,
+    // origin -> destination
     entries: HashMap<files::FilePath, files::FilePath>,
 }
 
