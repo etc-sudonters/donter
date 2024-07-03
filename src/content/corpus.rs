@@ -2,10 +2,6 @@ use super::page::Page;
 use crate::files;
 use std::path::Path;
 
-pub fn default() -> Corpus {
-    Default::default()
-}
-
 #[derive(Debug)]
 pub struct Corpus {
     pages: Vec<Page>,
@@ -18,7 +14,7 @@ pub enum CorpusEntry {
     StaticAsset(IncludedPath),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IncludedPath(files::Path);
 
 impl Corpus {

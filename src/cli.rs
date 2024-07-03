@@ -1,7 +1,7 @@
 use clap::Parser;
 use url::Url;
 
-use crate::{config, files};
+use crate::{config, files, processors::ArticleSlugStyle};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -14,10 +14,14 @@ pub struct Args {
     url_base: String,
     #[arg(short = 'T', value_name = "TEMPLATES")]
     template_path: std::path::PathBuf,
+    #[arg(short = 'P', value_name = "PATH")]
+    article_prefix: Option<String>,
+    #[arg(short = 'D', default_value_t = false)]
+    write_directories: bool,
 }
 
 impl Args {
-    pub fn make_config(self) -> config::Configuration {
+    pub fn make_config(mut self) -> config::Configuration {
         config::Configuration {
             content: config::Content {
                 base: unsafe { files::DirPath::new(self.content_path) },
@@ -33,6 +37,12 @@ impl Args {
                     }
                     _ => files::Path::Dir(unsafe { files::DirPath::new(self.output) }),
                 },
+                slug_style: if self.write_directories {
+                    ArticleSlugStyle::Directory
+                } else {
+                    ArticleSlugStyle::Page
+                },
+                article_prefix: self.article_prefix.take(),
             },
         }
     }

@@ -3,11 +3,7 @@ use std::{
     io, path,
 };
 
-use url::Url;
-
 use crate::{files, site};
-
-use super::url_to_relative_path;
 
 pub struct Files(files::DirPath);
 
@@ -17,8 +13,8 @@ impl Files {
         Ok(Self(dir))
     }
 
-    fn create_path(&self, url: Url) -> crate::Result<path::PathBuf> {
-        let mut path = self.0.join(url_to_relative_path(url));
+    fn create_path(&self, path: files::Path) -> crate::Result<path::PathBuf> {
+        let mut path = self.0.join(path);
 
         match path.extension() {
             None => fs::create_dir_all(&path)?,
@@ -37,11 +33,11 @@ impl Files {
 impl site::Writer for Files {
     fn write_static_asset(
         &mut self,
-        url: url::Url,
+        path: files::Path,
         asset: site::IncludedAsset,
     ) -> crate::Result<()> {
         use files::Path::*;
-        let dest = self.create_path(url)?;
+        let dest = self.create_path(path)?;
         match asset.path() {
             File(f) => {
                 fs::copy(f, dest)?;
@@ -59,10 +55,10 @@ impl site::Writer for Files {
 
     fn write_rendered_page(
         &mut self,
-        url: url::Url,
+        path: files::FilePath,
         page: site::RenderedPage,
     ) -> crate::Result<()> {
-        let mut fh = File::create(self.create_path(url)?)?;
+        let mut fh = File::create(self.create_path(path.into())?)?;
         io::copy(&mut page.read(), &mut fh)?;
         Ok(())
     }

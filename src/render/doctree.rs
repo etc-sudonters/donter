@@ -172,23 +172,28 @@ impl<'a> DoctreeRenderer<'a> {
     fn delete(&self, d: &doctree::Group, buffer: &mut PageBuffer) {
         self.wrap_children_inline("<s>", d, "</s>", buffer);
     }
+
     fn emphasis(&self, d: &doctree::Group, buffer: &mut PageBuffer) {
         self.wrap_children_inline("<em>", d, "</em>", buffer);
     }
+
     fn footnote_reference(&self, f: &doctree::FootnoteReference, buffer: &mut PageBuffer) {
         buffer.push(format!(
             "<span class=\"footnote reference\"><a href=\"#{0}\">{0}</a></span>",
             f
         ));
     }
+
     fn heading(&self, d: &doctree::Header, buffer: &mut PageBuffer) {
-        self.wrap_children_block(
-            format!("<h{}>", d.depth()),
-            d.children(),
-            format!("</h{}>", d.depth()),
-            buffer,
-        );
+        let mut opening = format!("<h{}", d.depth());
+        if let Some(id) = d.label() {
+            opening.push_str(format!("id=\"{}\"", id).as_str());
+        }
+        opening.push('>');
+
+        self.wrap_children_block(opening, d.children(), format!("</h{}>", d.depth()), buffer);
     }
+
     fn href_reference(&self, d: &doctree::HrefReference, buffer: &mut PageBuffer) {
         let def = self.page.hrefs.lookup(d).unwrap();
         self.wrap_children_inline(

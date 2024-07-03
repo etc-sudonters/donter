@@ -3,12 +3,11 @@ use super::doctree;
 use super::page::{Page, PageContents, PageMetadata, PageStatus};
 use super::Date;
 use crate::files;
-use url::Url;
 
 pub struct PageBuilder {
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
-    pub(crate) url_path: Option<Url>,
+    pub(crate) url_path: Option<files::FilePath>,
     pub(crate) notes: Definitions<doctree::FootnoteDefinition>,
     pub(crate) page_hrefs: Definitions<doctree::HrefDefinition>,
     pub(crate) when: Option<Date>,
@@ -45,12 +44,12 @@ impl PageBuilder {
         self
     }
 
-    pub fn url(&mut self, d: Url) -> &mut Self {
+    pub fn url(&mut self, d: files::FilePath) -> &mut Self {
         self.url_path = Some(d);
         self
     }
 
-    pub fn url_or(&mut self, d: Url) -> &mut Self {
+    pub fn url_or(&mut self, d: files::FilePath) -> &mut Self {
         if self.url_path.is_none() {
             self.url_path = Some(d);
         }

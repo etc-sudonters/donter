@@ -28,10 +28,19 @@ impl<'a> IntoIterator for Walker<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Path {
     File(FilePath),
     Dir(DirPath),
+}
+
+impl Display for Path {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File(f) => Display::fmt(f, fmt),
+            Self::Dir(d) => Display::fmt(d, fmt),
+        }
+    }
 }
 
 impl AsRef<path::Path> for Path {
@@ -54,9 +63,36 @@ impl Path {
             None
         }
     }
+
+    pub fn as_file(self) -> Option<FilePath> {
+        match self {
+            Self::File(f) => Some(f),
+
+            _ => None,
+        }
+    }
+
+    pub fn as_dir(self) -> Option<DirPath> {
+        match self {
+            Self::Dir(d) => Some(d),
+            _ => None,
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+impl From<FilePath> for Path {
+    fn from(value: FilePath) -> Self {
+        Self::File(value)
+    }
+}
+
+impl From<DirPath> for Path {
+    fn from(value: DirPath) -> Self {
+        Self::Dir(value)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FilePath(path::PathBuf);
 
 impl Deref for FilePath {
@@ -104,8 +140,9 @@ impl AsRef<str> for FilePath {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DirPath(path::PathBuf);
+
 impl DirPath {
     pub unsafe fn new<P: Into<path::PathBuf>>(p: P) -> DirPath {
         DirPath(p.into())
@@ -135,6 +172,12 @@ impl AsRef<path::Path> for DirPath {
 impl AsRef<path::Path> for FilePath {
     fn as_ref(&self) -> &path::Path {
         AsRef::<path::Path>::as_ref(&self.0)
+    }
+}
+
+impl Display for DirPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_string_lossy())
     }
 }
 

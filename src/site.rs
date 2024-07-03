@@ -4,8 +4,6 @@ use std::{
     mem,
 };
 
-use url::Url;
-
 use crate::{content, files, jinja, render::render_page, Result};
 
 pub struct Builder(Vec<Box<dyn Processor>>);
@@ -135,8 +133,7 @@ impl<'env> Donter<'env> {
                     site.add_page(dest, page)?;
                 }
                 content::CorpusEntry::StaticAsset(asset) => {
-                    let dest = Url::from_file_path(&asset).unwrap();
-                    site.add_static_asset(dest, asset)?;
+                    site.add_static_asset(asset.clone().into(), asset)?;
                 }
             }
         }
@@ -164,6 +161,7 @@ impl RenderedPage {
 }
 
 pub struct IncludedAsset(files::Path);
+
 impl IncludedAsset {
     pub fn read(self) -> crate::Result<impl std::io::Read> {
         Ok(std::fs::File::open(self.0)?)
@@ -180,7 +178,7 @@ pub enum Writable {
 }
 
 pub struct RenderedSite {
-    writables: HashMap<Url, Writable>,
+    writables: HashMap<files::Path, Writable>,
 }
 
 impl RenderedSite {
@@ -190,12 +188,12 @@ impl RenderedSite {
         }
     }
 
-    pub fn entries(self) -> impl std::iter::Iterator<Item = (Url, Writable)> {
+    pub fn entries(self) -> impl std::iter::Iterator<Item = (files::Path, Writable)> {
         self.writables.into_iter()
     }
 
-    pub fn add_page(&mut self, path: Url, content: RenderedPage) -> crate::Result<()> {
-        match self.writables.entry(path) {
+    pub fn add_page(&mut self, path: files::FilePath, content: RenderedPage) -> crate::Result<()> {
+        match self.writables.entry(path.into()) {
             Entry::Vacant(v) => {
                 v.insert(Writable::Page(content));
                 Ok(())
@@ -206,7 +204,7 @@ impl RenderedSite {
 
     pub fn add_static_asset(
         &mut self,
-        path: Url,
+        path: files::Path,
         content: content::IncludedPath,
     ) -> crate::Result<()> {
         match self.writables.entry(path) {
@@ -221,7 +219,7 @@ impl RenderedSite {
 
 #[derive(Debug)]
 pub enum SiteError {
-    AlreadyOccupied(Url),
+    AlreadyOccupied(files::Path),
 }
 
 impl Display for SiteError {
@@ -281,10 +279,10 @@ pub trait Writer {
     fn write(&mut self, site: RenderedSite) -> crate::Result<()> {
         use Writable::*;
 
-        for (url, writable) in site.entries() {
+        for (dest, writable) in site.entries() {
             match writable {
-                Page(page) => self.write_rendered_page(url, page)?,
-                Asset(asset) => self.write_static_asset(url, asset)?,
+                Page(page) => self.write_rendered_page(dest.as_file().unwrap(), page)?,
+                Asset(asset) => self.write_static_asset(dest, asset)?,
             }
         }
 
@@ -295,6 +293,11 @@ pub trait Writer {
         Ok(())
     }
 
-    fn write_rendered_page(&mut self, url: Url, page: RenderedPage) -> crate::Result<()>;
-    fn write_static_asset(&mut self, url: Url, asset: IncludedAsset) -> crate::Result<()>;
+    fn write_rendered_page(
+        &mut self,
+        path: files::FilePath,
+        page: RenderedPage,
+    ) -> crate::Result<()>;
+
+    fn write_static_asset(&mut self, path: files::Path, asset: IncludedAsset) -> crate::Result<()>;
 }

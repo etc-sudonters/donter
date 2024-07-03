@@ -3,9 +3,17 @@ use url::Url;
 
 use crate::{files, site};
 
+#[derive(Debug, Clone, Copy)]
+pub enum ArticleSlugStyle {
+    Directory,
+    Page,
+}
+
 pub struct Options {
     pub(crate) content_base: files::DirPath,
     pub(crate) site_base: Url,
+    pub(crate) slug_style: ArticleSlugStyle,
+    pub(crate) article_prefix: Option<String>,
 }
 
 impl Options {
@@ -26,7 +34,7 @@ impl Options {
 // use these new URLs
 pub struct Linker {
     opts: Options,
-    entries: HashMap<files::FilePath, Url>,
+    entries: HashMap<files::FilePath, files::FilePath>,
 }
 
 impl site::Processor for Linker {
@@ -44,20 +52,16 @@ impl Linker {
         }
     }
 
-    fn slug(&self, origin: &files::FilePath) -> Url {
-        let path = std::fs::canonicalize(origin).expect("could not canonicalize origin");
-        let path = path
-            .strip_prefix(&self.opts.content_base)
-            .expect("could not strip content base")
-            .to_str()
-            .unwrap();
+    fn slug(&self, origin: &files::FilePath) -> files::FilePath {
         let ext = origin.extension().unwrap().to_string_lossy().to_string();
+        let name = origin
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned().replace(&ext, "html"))
+            .unwrap();
 
-        let url = self
-            .opts
-            .site_base
-            .join(path.replace(ext.as_str(), "html").as_str());
-        println!("converted origin to: {:?} and {:?}", path, url);
-        url.unwrap()
+        match &self.opts.article_prefix {
+            None => unsafe { files::FilePath::new(name) },
+            Some(pre) => unsafe { files::FilePath::new([pre.as_str(), name.as_str()].join("/")) },
+        }
     }
 }

@@ -1,6 +1,6 @@
 use url::Url;
 
-use crate::files;
+use crate::{files, processors};
 use crate::{site, writers};
 use std::fs;
 
@@ -30,6 +30,8 @@ pub struct Site {
 #[derive(Clone, Debug)]
 pub struct Output {
     pub(crate) output: files::Path,
+    pub(crate) slug_style: processors::ArticleSlugStyle,
+    pub(crate) article_prefix: Option<String>,
 }
 
 impl Output {

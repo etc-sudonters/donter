@@ -25,6 +25,8 @@ fn main() -> Result<()> {
         .with(processors::Linker::new(processors::LinkerOptions {
             content_base: conf.content.base.clone(),
             site_base: conf.site.base_url.clone(),
+            slug_style: conf.output.slug_style,
+            article_prefix: conf.output.article_prefix.clone(),
         }))
         .create()?;
 

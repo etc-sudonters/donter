@@ -84,10 +84,6 @@ impl CodeLiteral {
     pub fn lines(&self) -> impl Iterator<Item = &str> {
         self.0.lines().into_iter()
     }
-
-    pub fn str(&self) -> &str {
-        self.0.as_str()
-    }
 }
 
 impl From<String> for CodeLiteral {
@@ -168,6 +164,7 @@ impl From<Group> for Element {
 pub struct Header {
     depth: u8,
     group: Group,
+    id: Option<String>,
 }
 
 impl Header {
@@ -175,6 +172,7 @@ impl Header {
         Header {
             depth,
             group: children,
+            id: None,
         }
     }
 
@@ -184,6 +182,10 @@ impl Header {
 
     pub fn children(&self) -> &Group {
         &self.group
+    }
+
+    pub fn label(&self) -> &Option<String> {
+        &self.id
     }
 }
 
