@@ -8,10 +8,14 @@ pub struct Corpus {
     included: Vec<IncludedPath>,
 }
 
-pub struct CorpusEntries(Vec<CorpusEntry>);
 pub enum CorpusEntry {
     Page(Page),
     StaticAsset(IncludedPath),
+}
+
+pub enum CorpusEntryRef<'a> {
+    Page(&'a Page),
+    StaticAsset(&'a IncludedPath),
 }
 
 #[derive(Debug, Clone)]
@@ -22,18 +26,28 @@ impl Corpus {
         self.pages.push(p);
     }
 
-    #[allow(dead_code, unused_variables)]
     pub fn include_asset(&mut self, p: files::Path) {
-        todo!();
+        self.included.push(IncludedPath(p))
     }
 
-    pub fn entries(self) -> CorpusEntries {
-        let (pages, included) = (self.pages, self.included);
+    pub fn into_entries(self) -> impl Iterator<Item = CorpusEntry> {
+        let entries = self.pages.into_iter().map(|p| CorpusEntry::Page(p));
+        let includes = self
+            .included
+            .into_iter()
+            .map(|p| CorpusEntry::StaticAsset(p));
 
-        let entries = pages.into_iter().map(|p| CorpusEntry::Page(p));
-        let includes = included.into_iter().map(|p| CorpusEntry::StaticAsset(p));
+        entries.chain(includes)
+    }
 
-        CorpusEntries(entries.chain(includes).collect())
+    pub fn entries(&self) -> impl Iterator<Item = CorpusEntryRef<'_>> {
+        let entries = self.pages.iter().map(|p| CorpusEntryRef::Page(p));
+        let includes = self.included.iter().map(|p| CorpusEntryRef::StaticAsset(p));
+        entries.chain(includes)
+    }
+
+    pub fn pages(&self) -> impl Iterator<Item = &Page> {
+        self.pages.iter()
     }
 }
 
@@ -43,14 +57,6 @@ impl Default for Corpus {
             pages: Vec::new(),
             included: Vec::new(),
         }
-    }
-}
-
-impl Iterator for CorpusEntries {
-    type Item = CorpusEntry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
     }
 }
 

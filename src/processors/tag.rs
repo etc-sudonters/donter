@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 
-use crate::{content, site};
+use crate::{
+    content::{self, Metadata},
+    files, site,
+};
 
-pub struct TagToken(u64);
+pub struct Tags(HashMap<files::FilePath, Vec<String>>);
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Tag(String);
-
-pub struct Tags;
+impl Tags {
+    pub fn new() -> Tags {
+        Self(Default::default())
+    }
+}
 
 impl site::Processor for Tags {
     fn initialize<'init, 'site>(
@@ -22,8 +26,17 @@ impl site::Processor for Tags {
     }
 
     fn page_load(&mut self, page: &mut content::PageBuilder) -> crate::Result<()> {
-        // read tags off page and record them here
-        // 1. How do we get the PageToken?
+        if let Some(Metadata::List(lst)) = page.meta.get("tags") {
+            let mut tags = Vec::with_capacity(lst.len());
+            for tag in lst.iter() {
+                if let Metadata::Str(s) = tag {
+                    tags.push(s.clone());
+                }
+            }
+
+            self.0.insert(page.filepath.clone(), tags);
+        }
+
         Ok(())
     }
 
@@ -32,11 +45,18 @@ impl site::Processor for Tags {
         page: &content::Page,
         ctx: &mut crate::jinja::RenderContext,
     ) -> crate::Result<()> {
-        // put tags into render context
+        if let Some(tags) = self.0.get(&page.meta.origin.0) {
+            ctx.merge(minijinja::context! {tags => tags});
+        }
+
         Ok(())
     }
 
-    fn site_render(&mut self, site: &mut site::RenderedSite) -> crate::Result<()> {
+    fn site_render(
+        &mut self,
+        renderer: &mut minijinja::Environment<'_>,
+        site: &mut site::RenderedSite,
+    ) -> crate::Result<()> {
         // generate tag pages
         Ok(())
     }

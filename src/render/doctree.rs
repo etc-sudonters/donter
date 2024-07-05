@@ -185,13 +185,12 @@ impl<'a> DoctreeRenderer<'a> {
     }
 
     fn heading(&self, d: &doctree::Header, buffer: &mut PageBuffer) {
-        let mut opening = format!("<h{}", d.depth());
-        if let Some(id) = d.label() {
-            opening.push_str(format!("id=\"{}\"", id).as_str());
-        }
-        opening.push('>');
-
-        self.wrap_children_block(opening, d.children(), format!("</h{}>", d.depth()), buffer);
+        buffer.push_line(format!(
+            "<h{0} id=\"{1}\"><span>{2}</span></h{0}>",
+            d.depth(),
+            d.label(),
+            d.text()
+        ));
     }
 
     fn href_reference(&self, d: &doctree::HrefReference, buffer: &mut PageBuffer) {

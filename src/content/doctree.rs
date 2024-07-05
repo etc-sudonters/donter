@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub enum Element {
     BlockQuote(Group),
     CodeBlock(Code),
@@ -20,7 +20,7 @@ pub enum Element {
     Text(Text),
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct List {
     li: Vec<ListItem>,
 }
@@ -41,7 +41,7 @@ impl List {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct ListItem(Group);
 
 impl ListItem {
@@ -56,7 +56,7 @@ impl From<Group> for ListItem {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Group {
     kids: Vec<Element>,
 }
@@ -77,7 +77,7 @@ impl Group {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct CodeLiteral(String);
 
 impl CodeLiteral {
@@ -98,7 +98,7 @@ impl AsRef<str> for CodeLiteral {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct CodeLanguage(String);
 
 impl From<String> for CodeLanguage {
@@ -107,7 +107,7 @@ impl From<String> for CodeLanguage {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Code {
     code: CodeLiteral,
     lang: Option<CodeLanguage>,
@@ -160,41 +160,40 @@ impl From<Group> for Element {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Header {
     depth: u8,
-    group: Group,
-    id: Option<String>,
+    display: String,
+    id: String,
 }
 
 impl Header {
-    pub fn create(depth: u8, children: Group) -> Self {
-        Header {
-            depth,
-            group: children,
-            id: None,
-        }
+    pub fn create(depth: u8, display: String, id: String) -> Self {
+        Header { depth, display, id }
     }
 
     pub fn depth(&self) -> u8 {
         self.depth
     }
 
-    pub fn children(&self) -> &Group {
-        &self.group
+    pub fn text(&self) -> &str {
+        &self.display
     }
 
-    pub fn label(&self) -> &Option<String> {
+    pub fn label(&self) -> &str {
         &self.id
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Text(String);
 
 impl Text {
     pub fn create(s: String) -> Text {
         Text(s)
+    }
+
+    pub fn inner(self) -> String {
+        self.0
     }
 }
 
@@ -210,14 +209,14 @@ impl Debug for Text {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Link {
     href: String,
     content: Box<Element>,
     title: Option<String>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct HrefDefinition {
     id: String,
     href_: String,
@@ -233,7 +232,7 @@ impl HrefDefinition {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct HrefReference {
     content: Group,
     id: String,
@@ -250,13 +249,13 @@ impl HrefReference {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Image {
     alt: String,
     href: String,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct ImageReference {
     href: String,
     alt: String,
@@ -268,7 +267,7 @@ impl ImageReference {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Table {
     r: Vec<TableRow>,
 }
@@ -289,7 +288,7 @@ impl Table {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct TableRow {
     c: Vec<TableCell>,
 }
@@ -308,7 +307,7 @@ impl TableRow {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct TableCell(Group);
 
 impl TableCell {
@@ -321,7 +320,7 @@ impl TableCell {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct FootnoteReference(String);
 
 impl Display for FootnoteReference {
@@ -342,7 +341,7 @@ impl From<FootnoteReference> for Element {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct FootnoteDefinition {
     id: String,
     content: Group,

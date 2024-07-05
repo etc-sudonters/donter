@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::files;
 
-use super::{doctree, Date, Definitions, Metadata, Origin};
+use super::{doctree, Definitions, Metadata, Origin};
 
 #[derive(Debug)]
 pub struct Page {
@@ -12,9 +12,10 @@ pub struct Page {
 
 #[derive(Debug)]
 pub struct PageMetadata {
+    pub(crate) title: String,
     pub(crate) origin: Origin,
     pub(crate) url: files::FilePath,
-    pub(crate) when: Option<Date>,
+    pub(crate) when: Option<String>,
     pub(crate) status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,

@@ -119,9 +119,13 @@ impl<'env> Donter<'env> {
             processor.page_render(&page, &mut ctx)?;
         }
 
-        ctx.merge(
-            minijinja::context! { page => minijinja::Value::from_safe_string(render_page(&page.content))},
-        );
+        ctx.merge(minijinja::context! {
+          page => minijinja::context!{
+            content => minijinja::Value::from_safe_string(render_page(&page.content)),
+            title => page.meta.title,
+            date => page.meta.when
+          }
+        });
 
         Ok(tpl
             .render(ctx)
@@ -136,10 +140,10 @@ impl<'env> Donter<'env> {
         Ok(())
     }
 
-    pub fn render_corpus(&mut self, corpus: content::Corpus) -> crate::Result<RenderedSite> {
+    pub fn render(&mut self, corpus: content::Corpus) -> crate::Result<RenderedSite> {
         let mut site = RenderedSite::new();
 
-        for entry in corpus.entries() {
+        for entry in corpus.into_entries() {
             match entry {
                 content::CorpusEntry::Page(mut p) => {
                     let dest = p.meta.url.clone();
@@ -150,6 +154,10 @@ impl<'env> Donter<'env> {
                     site.add_static_asset(asset.clone().into(), asset)?;
                 }
             }
+        }
+
+        for processor in self.processors.iter_mut() {
+            processor.site_render(&mut self.renderer, &mut site)?;
         }
 
         Ok(site)
@@ -165,6 +173,10 @@ impl<'env> Donter<'env> {
 
 pub struct RenderedPage(VecDeque<u8>);
 impl RenderedPage {
+    pub fn new<I: Into<VecDeque<u8>>>(content: I) -> Self {
+        RenderedPage(content.into())
+    }
+
     pub fn read(self) -> impl std::io::Read {
         self.0
     }
@@ -276,11 +288,15 @@ pub trait Processor {
         Ok(())
     }
 
-    fn page_render(&mut self, page: &content::Page, tx: &mut jinja::RenderContext) -> Result<()> {
+    fn page_render(&mut self, page: &content::Page, ctx: &mut jinja::RenderContext) -> Result<()> {
         Ok(())
     }
 
-    fn site_render(&mut self, site: &mut RenderedSite) -> Result<()> {
+    fn site_render<'a>(
+        &mut self,
+        renderer: &mut minijinja::Environment<'_>,
+        site: &mut RenderedSite,
+    ) -> Result<()> {
         Ok(())
     }
 

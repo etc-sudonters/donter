@@ -3,13 +3,7 @@ use serde::de::Visitor;
 use crate::files;
 
 #[derive(Debug)]
-pub struct Origin(files::FilePath);
-
-impl Origin {
-    pub fn new(p: files::FilePath) -> Origin {
-        Self(p)
-    }
-}
+pub struct Origin(pub files::FilePath);
 
 impl std::ops::Deref for Origin {
     type Target = files::FilePath;

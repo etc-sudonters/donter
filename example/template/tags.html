@@ -1,0 +1,19 @@
+<ul>
+{% for (archive, pages) in archive %}
+  <li>
+    <p> {{ archive }} </p>
+    <ul>
+    {% for page in pages %}
+      <li> 
+        <article>
+          <h2>{{ page.title }}</h2>
+          {% if page.summary %}
+          <p> {{ page.summary | safe }} </p>
+          {% endif %}
+        </article>
+    {% endfor %}
+    </ul>
+  </li>
+{% endfor %}
+</ul>
+

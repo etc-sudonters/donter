@@ -1,8 +1,13 @@
 use super::Error;
+
 use crate::{
     content::{self, doctree},
     md::frontmatter::frontmatter_to_page_meta,
 };
+
+fn slug<S: AsRef<str>>(s: S) -> String {
+    s.as_ref().replace(' ', "-").to_lowercase()
+}
 
 pub struct MarkdownPageBuilder<'p> {
     groups: Vec<doctree::Group>,
@@ -150,10 +155,16 @@ impl<'p> MarkdownPageBuilder<'p> {
     }
 
     fn header(&mut self, header: &markdown::mdast::Heading) -> crate::Result<()> {
-        let children = self.collect_children(&header.children)?;
-        let header = doctree::Header::create(header.depth, children.into());
-        self.push_element(doctree::Element::Heading(header));
-        Ok(())
+        match doctree::Element::from(self.collect_children(&header.children)?) {
+            doctree::Element::Text(txt) => {
+                let display = txt.inner();
+                let id = slug(&display);
+                let header = doctree::Header::create(header.depth, display, id);
+                self.push_element(doctree::Element::Heading(header));
+                Ok(())
+            }
+            _ => Err(todo!()),
+        }
     }
 
     fn image(&mut self, img: &markdown::mdast::Image) -> crate::Result<()> {

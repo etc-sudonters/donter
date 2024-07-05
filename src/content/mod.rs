@@ -14,15 +14,6 @@ pub use page::{Page, PageContents, PageMetadata, PageStatus};
 pub use pagebuilder::PageBuilder;
 
 #[derive(Debug)]
-pub struct Date(String);
-
-impl Date {
-    pub fn new(when: String) -> Date {
-        Self(when)
-    }
-}
-
-#[derive(Debug)]
 pub enum Error {}
 
 impl std::error::Error for Error {}

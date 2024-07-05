@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use super::definitions::Definitions;
 use super::page::{Page, PageContents, PageMetadata, PageStatus};
+use super::Metadata;
 use super::{doctree, meta};
-use super::{Date, Metadata};
 use crate::files;
 
 pub struct PageBuilder {
@@ -13,7 +13,7 @@ pub struct PageBuilder {
     pub(crate) url_path: Option<files::FilePath>,
     pub(crate) notes: Definitions<doctree::FootnoteDefinition>,
     pub(crate) page_hrefs: Definitions<doctree::HrefDefinition>,
-    pub(crate) when: Option<Date>,
+    pub(crate) when: Option<String>,
     pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,
@@ -40,7 +40,7 @@ impl PageBuilder {
         self
     }
 
-    pub fn written(&mut self, d: Date) -> &mut Self {
+    pub fn written(&mut self, d: String) -> &mut Self {
         self.when = Some(d);
         self
     }
@@ -86,7 +86,8 @@ impl PageBuilder {
     pub fn build(mut self) -> crate::Result<Page> {
         Ok(Page {
             meta: PageMetadata {
-                origin: super::Origin::new(self.filepath),
+                title: self.title,
+                origin: super::Origin(self.filepath),
                 url: self.url_path.unwrap(),
                 when: self.when.take(),
                 status: self.page_status,

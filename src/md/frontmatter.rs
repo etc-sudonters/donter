@@ -1,23 +1,48 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use markdown::mdast;
 use yaml_rust2::{self as yaml, yaml::Hash, Yaml, YamlLoader};
 
-use crate::content::{self, Metadata, PageBuilder, PageStatus};
+use crate::{
+    content::{self, Metadata, PageBuilder, PageStatus},
+    files,
+};
+
+#[derive(Debug)]
+pub struct GenericError(String);
+
+impl GenericError {
+    pub fn with_reason<E: std::fmt::Display, S: AsRef<str>>(err: E, reason: S) -> GenericError {
+        Self(format!("{}: {}", reason.as_ref(), err))
+    }
+}
+
+impl std::error::Error for GenericError {}
+
+impl Display for GenericError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub fn frontmatter_to_page_meta(y: &mdast::Yaml, b: &mut PageBuilder) -> crate::Result<()> {
-    let docs = YamlLoader::load_from_str(&y.value)?;
+    let docs = YamlLoader::load_from_str(&y.value)
+        .map_err(|e| GenericError::with_reason(e, format!("on page {}", b.filepath)))?;
     let metadoc = &docs[0];
 
-    let meta = match &docs[0] {
-        Yaml::Hash(map) => convert_yaml_map(map)?,
+    b.meta = match &docs[0] {
+        Yaml::Hash(map) => convert_yaml_map(map)?
+            .into_iter()
+            .map(|(k, v)| (k.to_lowercase(), v))
+            .collect(),
         _ => Err(super::Error::Unexpected(
             "frontmatter must have object at top level".to_owned(),
         ))?,
     };
 
     b.with_title(
-        meta.get("title")
+        b.meta
+            .get("title")
             .map(|t| match t {
                 Metadata::Str(s) => Ok(s.clone()),
                 _ => Err(super::Error::Unexpected(
@@ -28,16 +53,18 @@ pub fn frontmatter_to_page_meta(y: &mdast::Yaml, b: &mut PageBuilder) -> crate::
     );
 
     b.written(
-        meta.get("date")
+        b.meta
+            .get("date")
             .map(|d| match d {
-                Metadata::Str(s) => Ok(content::Date::new(s.clone())),
+                Metadata::Str(s) => Ok(s.clone()),
                 _ => Err(super::Error::Unexpected("date must be a string".to_owned())),
             })
             .expect("date key must be provided")?,
     );
 
     b.status(
-        meta.get("status")
+        b.meta
+            .get("status")
             .map(|s| match s {
                 Metadata::Str(s) => Ok(match s.to_lowercase().as_str() {
                     "draft" => PageStatus::Draft,
@@ -50,13 +77,11 @@ pub fn frontmatter_to_page_meta(y: &mdast::Yaml, b: &mut PageBuilder) -> crate::
             .unwrap_or(Ok(PageStatus::Published))?,
     );
 
-    b.meta = meta;
-
     Ok(())
 }
 
 impl TryFrom<&Yaml> for Metadata {
-    type Error = super::Error;
+    type Error = Box<dyn std::error::Error>;
     fn try_from(value: &Yaml) -> Result<Self, Self::Error> {
         match value {
             r @ Yaml::Real(_) => Ok(Metadata::Number(r.as_f64().unwrap())),
@@ -70,18 +95,23 @@ impl TryFrom<&Yaml> for Metadata {
             Yaml::Integer(i) => Ok(Metadata::Number(*i as f64)),
             _ => Err(super::Error::Unexpected(
                 "Unsupported yaml in frontmatter".to_owned(),
-            )),
+            ))?,
         }
     }
 }
 
-fn convert_yaml_map(m: &Hash) -> Result<HashMap<String, Metadata>, super::Error> {
+fn convert_yaml_map(m: &Hash) -> crate::Result<HashMap<String, Metadata>> {
     let mut map = HashMap::new();
 
     for (k, v) in m.iter() {
         match k {
             Yaml::String(s) => {
-                map.insert(s.to_lowercase(), v.try_into()?);
+                map.insert(
+                    s.to_lowercase(),
+                    v.try_into().map_err(|e| {
+                        GenericError::with_reason(e, format!("while processing key: {s}"))
+                    })?,
+                );
             }
             _ => Err(super::Error::Unexpected(
                 "Frontmatter objects must have string keys".to_owned(),

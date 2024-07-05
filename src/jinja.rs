@@ -72,9 +72,8 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    pub fn merge(&mut self, merge: minijinja::Value) -> &Self {
+    pub fn merge(&mut self, merge: minijinja::Value) {
         self.ctx = minijinja::context!(..merge, ..self.take());
-        self
     }
 
     fn take(&mut self) -> minijinja::Value {
