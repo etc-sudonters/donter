@@ -16,6 +16,7 @@ impl Files {
     fn create_path(&self, path: files::Path) -> crate::Result<path::PathBuf> {
         let mut path = self.0.join(path);
 
+        println!("writing {}", path.to_string_lossy());
         match path.extension() {
             None => fs::create_dir_all(&path)?,
             Some(_) => {

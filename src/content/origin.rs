@@ -2,8 +2,14 @@ use serde::de::Visitor;
 
 use crate::files;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Origin(pub files::FilePath);
+
+impl Clone for Origin {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 impl std::ops::Deref for Origin {
     type Target = files::FilePath;

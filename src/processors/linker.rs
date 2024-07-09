@@ -9,44 +9,30 @@ pub enum ArticleSlugStyle {
     Page,
 }
 
-pub struct Options {
-    pub(crate) content_base: files::DirPath,
-    pub(crate) site_base: Url,
+pub struct Options<'a> {
+    pub(crate) content_base: &'a files::DirPath,
+    pub(crate) site_base: &'a Url,
     pub(crate) slug_style: ArticleSlugStyle,
     pub(crate) article_prefix: Option<String>,
 }
 
-impl Options {
-    pub fn canonicalize(self) -> Options {
-        Options {
-            content_base: unsafe {
-                files::DirPath::new(
-                    std::fs::canonicalize(self.content_base)
-                        .expect("cannot canonicalize content base"),
-                )
-            },
-            ..self
-        }
-    }
-}
-
-pub struct Linker {
-    opts: Options,
+pub struct Linker<'a> {
+    opts: Options<'a>,
     // origin -> destination
     entries: HashMap<files::FilePath, files::FilePath>,
 }
 
-impl site::Processor for Linker {
+impl<'a> site::Processor for Linker<'a> {
     fn page_load(&mut self, page: &mut crate::content::PageBuilder) -> crate::Result<()> {
         page.url_or(self.slug(page));
         Ok(())
     }
 }
 
-impl Linker {
-    pub fn new(opts: Options) -> Linker {
+impl<'a> Linker<'a> {
+    pub fn new(opts: Options<'a>) -> Linker {
         Self {
-            opts: opts.canonicalize(),
+            opts,
             entries: HashMap::new(),
         }
     }
@@ -72,7 +58,7 @@ impl Linker {
 
         match &self.opts.article_prefix {
             None => unsafe { files::FilePath::new(name) },
-            Some(pre) => unsafe { files::FilePath::new([pre.as_str(), name.as_str()].join("/")) },
+            Some(pre) => unsafe { files::FilePath::new([pre, name.as_str()].join("/")) },
         }
     }
 }

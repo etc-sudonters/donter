@@ -53,33 +53,53 @@ impl PageBuffer {
 pub fn render_page(page: &content::PageContents) -> String {
     let mut buffer = PageBuffer::new();
     let helper = DoctreeRenderer {
-        page: &page,
         highlighter: Box::new(NullHighligher),
+        doctree: &page.content,
+        footnotes: &page.footnotes,
+        hrefs: &page.hrefs,
     };
     buffer.push_line("<article>");
     buffer.indent();
     helper.render(&mut buffer);
+    helper.include_footnotes(&mut buffer);
     buffer.push_line("</article>");
     buffer.flush()
 }
 
+pub fn render_summary(
+    summary: &Vec<doctree::Element>,
+    footnotes: &content::Definitions<doctree::FootnoteDefinition>,
+    hrefs: &content::Definitions<doctree::HrefDefinition>,
+) -> String {
+    let mut buffer = PageBuffer::new();
+    let helper = DoctreeRenderer {
+        doctree: summary,
+        highlighter: Box::new(NullHighligher),
+        footnotes,
+        hrefs,
+    };
+    helper.render(&mut buffer);
+    buffer.flush()
+}
+
 struct DoctreeRenderer<'a> {
-    page: &'a content::PageContents,
+    doctree: &'a Vec<doctree::Element>,
+    footnotes: &'a content::Definitions<doctree::FootnoteDefinition>,
+    hrefs: &'a content::Definitions<doctree::HrefDefinition>,
     highlighter: Box<dyn CodeHighlighter>,
 }
 
 impl<'a> DoctreeRenderer<'a> {
     pub fn render(&self, buffer: &mut PageBuffer) {
-        self.render_elms(&self.page.content, buffer);
-        self.include_footnotes(buffer);
+        self.render_elms(self.doctree, buffer);
     }
 
-    fn include_footnotes(&self, buffer: &mut PageBuffer) {
+    pub fn include_footnotes(&self, buffer: &mut PageBuffer) {
         buffer.push_line("<div class=\"footnotes\">");
         buffer.indent();
         buffer.push_line("<ol>");
 
-        for ftn in self.page.footnotes.definitions() {
+        for ftn in self.footnotes.definitions() {
             self.wrap_children_block(
                 format!("<li id=\"{}\">", ftn.label()),
                 ftn.children(),
@@ -194,7 +214,7 @@ impl<'a> DoctreeRenderer<'a> {
     }
 
     fn href_reference(&self, d: &doctree::HrefReference, buffer: &mut PageBuffer) {
-        let def = self.page.hrefs.lookup(d).unwrap();
+        let def = self.hrefs.lookup(d).unwrap();
         self.wrap_children_inline(
             format!("<a href=\"{}\">", def.href()),
             d.children(),
@@ -203,7 +223,7 @@ impl<'a> DoctreeRenderer<'a> {
         );
     }
     fn image_reference(&self, d: &doctree::ImageReference, buffer: &mut PageBuffer) {
-        let def = self.page.hrefs.lookup(d).unwrap();
+        let def = self.hrefs.lookup(d).unwrap();
         buffer.push(format!("<img href=\"{}\" />", def.href()));
     }
 

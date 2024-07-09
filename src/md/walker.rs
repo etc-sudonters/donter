@@ -1,7 +1,9 @@
+use markdown::mdast;
+
 use super::Error;
 
 use crate::{
-    content::{self, doctree},
+    content::{self, doctree, Metadata},
     md::frontmatter::frontmatter_to_page_meta,
 };
 
@@ -12,13 +14,15 @@ fn slug<S: AsRef<str>>(s: S) -> String {
 pub struct MarkdownPageBuilder<'p> {
     groups: Vec<doctree::Group>,
     builder: &'p mut content::PageBuilder,
+    opts: &'p markdown::ParseOptions,
 }
 
 impl<'p> MarkdownPageBuilder<'p> {
-    pub fn new(builder: &'p mut content::PageBuilder) -> Self {
+    pub fn new(builder: &'p mut content::PageBuilder, opts: &'p markdown::ParseOptions) -> Self {
         Self {
             groups: Default::default(),
             builder,
+            opts,
         }
     }
 
@@ -79,7 +83,7 @@ impl<'p> MarkdownPageBuilder<'p> {
     fn walk(&mut self, node: &markdown::mdast::Node) -> crate::Result<()> {
         use markdown::mdast::Node;
         match node {
-            Node::Yaml(y) => frontmatter_to_page_meta(y, &mut self.builder),
+            Node::Yaml(y) => self.handle_meta(y),
             Node::Root(_) => Error::Unexpected("Unexpected nested root element".to_owned()).into(),
             Node::BlockQuote(quote) => self.blockquote(quote),
             Node::Code(block) => self.codeblock(block),
@@ -102,6 +106,23 @@ impl<'p> MarkdownPageBuilder<'p> {
             Node::Break(_) | Node::ThematicBreak(_) => Ok(()),
             any @ _ => Error::Unexpected(format!("Unexpected element: {:?}", any)).into(),
         }
+    }
+
+    fn handle_meta(&mut self, meta: &mdast::Yaml) -> crate::Result<()> {
+        frontmatter_to_page_meta(meta, self.builder)?;
+
+        if let Some(Metadata::Str(s)) = self.builder.meta.remove("summary") {
+            let node = markdown::to_mdast(&s, self.opts).map_err(|e| Error::ParseError(e))?;
+            self.builder.summary = Some(match node {
+                mdast::Node::Root(r) => self.collect_children(&r.children)?,
+                node @ _ => {
+                    self.push_group();
+                    self.walk(&node)?;
+                    self.pop_group()
+                }
+            });
+        }
+        Ok(())
     }
 
     fn codeblock(&mut self, code: &markdown::mdast::Code) -> crate::Result<()> {
@@ -149,7 +170,7 @@ impl<'p> MarkdownPageBuilder<'p> {
         self.builder
             .footnotes(|notes| notes.add_label(&ftn.identifier));
         self.push_element(doctree::Element::FootnoteReference(
-            doctree::FootnoteReference::from(&ftn.identifier),
+            doctree::FootnoteReference::from(ftn.identifier.clone()),
         ));
         Ok(())
     }

@@ -1,61 +1,62 @@
 use super::page::Page;
 use crate::files;
-use std::path::Path;
+use std::{borrow::Borrow, collections::HashMap, path::Path};
 
 #[derive(Debug)]
 pub struct Corpus {
-    pages: Vec<Page>,
-    included: Vec<IncludedPath>,
+    lookup: HashMap<files::FilePath, usize>,
+    entries: Vec<CorpusEntry>,
 }
 
+#[derive(Debug)]
 pub enum CorpusEntry {
     Page(Page),
     StaticAsset(IncludedPath),
-}
-
-pub enum CorpusEntryRef<'a> {
-    Page(&'a Page),
-    StaticAsset(&'a IncludedPath),
 }
 
 #[derive(Debug, Clone)]
 pub struct IncludedPath(files::Path);
 
 impl Corpus {
+    pub fn get(&self, origin: files::FilePath) -> Option<&CorpusEntry> {
+        self.lookup
+            .get(&origin)
+            .map(|idx| self.entries.get(*idx))
+            .flatten()
+    }
+
     pub fn add_page(&mut self, p: Page) {
-        self.pages.push(p);
+        let idx = self.entries.len();
+        let origin: files::FilePath = (*p.meta.origin).clone();
+        self.lookup.insert((*p.meta.origin).clone(), idx);
+        self.entries.push(CorpusEntry::Page(p));
     }
 
     pub fn include_asset(&mut self, p: files::Path) {
-        self.included.push(IncludedPath(p))
+        self.entries.push(CorpusEntry::StaticAsset(IncludedPath(p)));
     }
 
     pub fn into_entries(self) -> impl Iterator<Item = CorpusEntry> {
-        let entries = self.pages.into_iter().map(|p| CorpusEntry::Page(p));
-        let includes = self
-            .included
-            .into_iter()
-            .map(|p| CorpusEntry::StaticAsset(p));
-
-        entries.chain(includes)
+        self.entries.into_iter()
     }
 
-    pub fn entries(&self) -> impl Iterator<Item = CorpusEntryRef<'_>> {
-        let entries = self.pages.iter().map(|p| CorpusEntryRef::Page(p));
-        let includes = self.included.iter().map(|p| CorpusEntryRef::StaticAsset(p));
-        entries.chain(includes)
+    pub fn entries(&self) -> impl Iterator<Item = &CorpusEntry> {
+        self.entries.iter()
     }
 
     pub fn pages(&self) -> impl Iterator<Item = &Page> {
-        self.pages.iter()
+        self.entries.iter().filter_map(|entry| match entry {
+            CorpusEntry::Page(p) => Some(p),
+            _ => None,
+        })
     }
 }
 
 impl Default for Corpus {
     fn default() -> Self {
         Corpus {
-            pages: Vec::new(),
-            included: Vec::new(),
+            lookup: Default::default(),
+            entries: Default::default(),
         }
     }
 }

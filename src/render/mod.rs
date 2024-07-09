@@ -3,7 +3,7 @@ mod highlight;
 use std::fmt::Display;
 
 use crate::site;
-pub use doctree::render_page;
+pub use doctree::{render_page, render_summary};
 pub use highlight::{CodeHighlighter, NullHighligher};
 
 struct DisplayableOption<'a, T>

@@ -19,9 +19,10 @@ pub struct PageMetadata {
     pub(crate) status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,
+    pub(crate) summary: Option<doctree::Group>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum PageStatus {
     Published,
     Draft,

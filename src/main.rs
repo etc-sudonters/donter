@@ -13,38 +13,48 @@ mod writers;
 use std::error::Error;
 
 use clap::Parser;
+use content::Origin;
+use files::FilePath;
 use processors::{Archive, DateArchivist, TagArchivist, TagSorting};
+use site::RenderedPageMetadata;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 fn main() -> Result<()> {
-    let conf = cli::Args::parse().make_config();
-
+    let mut conf = cli::Args::parse().make_config();
     let mut app = site::Builder::new()
         .with(processors::Linker::new(processors::LinkerOptions {
-            content_base: conf.content.base.clone(),
-            site_base: conf.site.base_url.clone(),
+            content_base: &conf.content.base,
+            site_base: &conf.site.base_url,
             slug_style: conf.output.slug_style,
-            article_prefix: conf.output.article_prefix.clone(),
+            article_prefix: conf.output.article_prefix.take(),
         }))
-        .with(processors::Tags::new())
+        .with(processors::Tags)
         .with_when(conf.output.clean, || {
-            processors::Cleaner::new(conf.output.output.clone())
+            processors::Cleaner(conf.output.output.clone())
         })
-        .with(jinja::Jinja::new(conf.site.templates.clone()))
+        .with(jinja::Jinja(&conf.site.templates))
         .with(md::Md)
         .with(Archive::new(
             TagArchivist(TagSorting::Alphabetical),
-            "tags.html",
+            RenderedPageMetadata {
+                title: "Tag Archive".to_owned(),
+                origin: Origin(unsafe { files::FilePath::new("tags.html") }),
+                url: unsafe { files::FilePath::new("tags.html") },
+                when: None,
+                status: content::PageStatus::Published,
+                tpl_name: "tags.html".to_owned(),
+                summary: "".to_owned(),
+            },
         ))
-        //        .with(Archive::new(DateArchivist("YYYY-MM"), "dates.html"))
         .create()?;
 
     let mut corpus = content::Corpus::default();
     app.load(&conf.content.base(), &mut corpus)?;
     app.process(&mut corpus)?;
     let mut writer = conf.output.writer()?;
-    writer.write(app.render(corpus)?)?;
+    writer.write(app.render(&corpus)?)?;
+    app.finalize()?;
     writer.flush()?;
     println!("all done!");
     Ok(())

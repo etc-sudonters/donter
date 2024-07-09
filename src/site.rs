@@ -1,46 +1,50 @@
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     fmt::Display,
+    marker::PhantomData,
     mem,
 };
 
-use crate::{content, files, jinja, render::render_page, Result};
+use crate::{
+    content::{self, PageMetadata},
+    files, jinja,
+    render::{render_page, render_summary},
+    Result,
+};
 
-pub struct Builder(Vec<Box<dyn Processor>>);
+pub struct Builder<'a>(Vec<Box<dyn Processor + 'a>>);
 
-impl Builder {
-    pub fn new() -> Builder {
+impl<'a> Builder<'a> {
+    pub fn new() -> Self {
         Self(vec![])
     }
 
-    pub fn with_when<F, P>(&mut self, cond: bool, factory: F) -> &mut Self
+    pub fn with_when<F, P>(mut self, cond: bool, factory: F) -> Self
     where
-        P: 'static + Processor,
+        P: Processor + 'a,
         F: FnOnce() -> P,
     {
         if cond {
-            self.with(factory());
+            self.with(factory())
+        } else {
+            self
         }
-
-        self
     }
 
-    pub fn with<P: 'static + Processor>(&mut self, processor: P) -> &mut Self {
+    pub fn with<P: Processor + 'a>(mut self, processor: P) -> Self {
         self.0.push(Box::new(processor));
         self
     }
 
-    pub fn create<'a>(&mut self) -> crate::Result<Donter<'a>> {
-        let mut processors = vec![];
-        mem::swap(&mut self.0, &mut processors);
-        Donter::create(processors)
+    pub fn create(mut self) -> crate::Result<Donter<'a>> {
+        Donter::create(self.0)
     }
 }
 
 pub struct Donter<'a> {
     renderer: minijinja::Environment<'a>,
-    processors: Vec<Box<dyn Processor>>,
-    loaders: Vec<Box<dyn Loader>>,
+    processors: Vec<Box<dyn Processor + 'a>>,
+    loaders: Vec<Box<dyn Loader + 'a>>,
 }
 
 pub struct Initializer<'builder, 'env> {
@@ -63,7 +67,7 @@ impl<'builder, 'env> Initializer<'builder, 'env> {
 }
 
 impl<'env> Donter<'env> {
-    pub fn create(mut processors: Vec<Box<dyn Processor>>) -> crate::Result<Donter<'env>> {
+    pub fn create(mut processors: Vec<Box<dyn Processor + 'env>>) -> crate::Result<Donter<'env>> {
         let mut renderer = minijinja::Environment::new();
         let mut loaders = Default::default();
 
@@ -108,7 +112,7 @@ impl<'env> Donter<'env> {
         Ok(())
     }
 
-    pub fn render_page(&mut self, page: content::Page) -> crate::Result<RenderedPage> {
+    pub fn render_page(&mut self, page: &content::Page) -> crate::Result<RenderedPage> {
         let tpl = self
             .renderer
             .get_template(&page.meta.tpl_name)
@@ -127,9 +131,31 @@ impl<'env> Donter<'env> {
           }
         });
 
-        Ok(tpl
-            .render(ctx)
-            .map(|rendered| RenderedPage(rendered.into_bytes().into()))?)
+        Ok(tpl.render(ctx).map(|rendered| {
+            RenderedPage::new(
+                VecDeque::from(rendered.into_bytes()),
+                RenderedPageMetadata {
+                    title: page.meta.title.clone(),
+                    origin: page.meta.origin.clone(),
+                    url: page.meta.url.clone(),
+                    when: page.meta.when.clone(),
+                    status: page.meta.status,
+                    tpl_name: page.meta.tpl_name.clone(),
+                    summary: page
+                        .meta
+                        .summary
+                        .as_ref()
+                        .map(|summ| {
+                            render_summary(
+                                summ.children(),
+                                &page.content.footnotes,
+                                &page.content.hrefs,
+                            )
+                        })
+                        .unwrap_or(Default::default()),
+                },
+            )
+        })?)
     }
 
     pub fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
@@ -140,14 +166,14 @@ impl<'env> Donter<'env> {
         Ok(())
     }
 
-    pub fn render(&mut self, corpus: content::Corpus) -> crate::Result<RenderedSite> {
+    pub fn render(&mut self, corpus: &content::Corpus) -> crate::Result<RenderedSite> {
         let mut site = RenderedSite::new();
 
-        for entry in corpus.into_entries() {
+        for entry in corpus.entries() {
             match entry {
-                content::CorpusEntry::Page(mut p) => {
+                content::CorpusEntry::Page(p) => {
                     let dest = p.meta.url.clone();
-                    let page = self.render_page(p)?;
+                    let page = self.render_page(&p)?;
                     site.add_page(dest, page)?;
                 }
                 content::CorpusEntry::StaticAsset(asset) => {
@@ -157,7 +183,7 @@ impl<'env> Donter<'env> {
         }
 
         for processor in self.processors.iter_mut() {
-            processor.site_render(&mut self.renderer, &mut site)?;
+            processor.site_render(&mut self.renderer, &corpus, &mut site)?;
         }
 
         Ok(site)
@@ -171,18 +197,40 @@ impl<'env> Donter<'env> {
     }
 }
 
-pub struct RenderedPage(VecDeque<u8>);
+pub struct RenderedPage {
+    content: VecDeque<u8>,
+    meta: RenderedPageMetadata,
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderedPageMetadata {
+    pub(crate) title: String,
+    pub(crate) origin: content::Origin,
+    pub(crate) url: files::FilePath,
+    pub(crate) when: Option<String>,
+    pub(crate) status: content::PageStatus,
+    pub(crate) tpl_name: String,
+    pub(crate) summary: String,
+}
+
 impl RenderedPage {
-    pub fn new<I: Into<VecDeque<u8>>>(content: I) -> Self {
-        RenderedPage(content.into())
+    pub fn new<I: Into<VecDeque<u8>>>(content: I, meta: RenderedPageMetadata) -> Self {
+        RenderedPage {
+            content: content.into(),
+            meta,
+        }
     }
 
     pub fn read(self) -> impl std::io::Read {
-        self.0
+        self.content
     }
 
     pub fn size(&self) -> u64 {
-        self.0.len() as u64
+        self.content.len() as u64
+    }
+
+    pub fn metadata(&self) -> &RenderedPageMetadata {
+        &self.meta
     }
 }
 
@@ -205,12 +253,14 @@ pub enum Writable {
 
 pub struct RenderedSite {
     writables: HashMap<files::Path, Writable>,
+    origins: HashMap<content::Origin, files::Path>,
 }
 
 impl RenderedSite {
     pub fn new() -> RenderedSite {
         Self {
             writables: Default::default(),
+            origins: Default::default(),
         }
     }
 
@@ -218,9 +268,22 @@ impl RenderedSite {
         self.writables.into_iter()
     }
 
+    pub fn get_page_by_origin(&self, origin: &content::Origin) -> Option<&RenderedPage> {
+        match self.origins.get(origin) {
+            None => None,
+            Some(dest) => match self.writables.get(dest).unwrap() {
+                Writable::Page(p) => Some(p),
+                _ => None,
+            },
+        }
+    }
+
     pub fn add_page(&mut self, path: files::FilePath, content: RenderedPage) -> crate::Result<()> {
-        match self.writables.entry(path.into()) {
+        match self.writables.entry(path.clone().into()) {
             Entry::Vacant(v) => {
+                let origin = &content.meta.origin;
+                self.origins.insert(origin.clone(), v.key().clone());
+
                 v.insert(Writable::Page(content));
                 Ok(())
             }
@@ -231,11 +294,11 @@ impl RenderedSite {
     pub fn add_static_asset(
         &mut self,
         path: files::Path,
-        content: content::IncludedPath,
+        content: &content::IncludedPath,
     ) -> crate::Result<()> {
         match self.writables.entry(path) {
             Entry::Vacant(v) => {
-                v.insert(Writable::Asset(IncludedAsset(content.into())));
+                v.insert(Writable::Asset(IncludedAsset(content.clone().into())));
                 Ok(())
             }
             Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(o.key().clone()))),
@@ -295,6 +358,7 @@ pub trait Processor {
     fn site_render<'a>(
         &mut self,
         renderer: &mut minijinja::Environment<'_>,
+        corpus: &content::Corpus,
         site: &mut RenderedSite,
     ) -> Result<()> {
         Ok(())
@@ -310,6 +374,7 @@ pub trait Writer {
         use Writable::*;
 
         for (dest, writable) in site.entries() {
+            println!("writing {}", dest);
             match writable {
                 Page(page) => self.write_rendered_page(dest.as_file().unwrap(), page)?,
                 Asset(asset) => self.write_static_asset(dest, asset)?,

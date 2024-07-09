@@ -1,13 +1,7 @@
 use crate::{files, site};
 use std::fs;
 
-pub struct Cleaner(files::Path);
-
-impl Cleaner {
-    pub fn new<P: Into<files::Path>>(p: P) -> Self {
-        Cleaner(p.into())
-    }
-}
+pub struct Cleaner(pub files::Path);
 
 impl site::Processor for Cleaner {
     fn initialize<'call, 'init>(

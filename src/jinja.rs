@@ -4,17 +4,9 @@ use minijinja;
 
 use crate::{files, site};
 
-pub struct Jinja {
-    template_path: files::DirPath,
-}
+pub struct Jinja<'a>(pub &'a files::DirPath);
 
-impl Jinja {
-    pub fn new(template_path: files::DirPath) -> Self {
-        Self { template_path }
-    }
-}
-
-impl site::Processor for Jinja {
+impl<'a> site::Processor for Jinja<'a> {
     fn initialize<'call, 'init>(
         &'call mut self,
         site: &'call mut site::Initializer<'init, '_>,
@@ -22,7 +14,7 @@ impl site::Processor for Jinja {
     where
         'init: 'call,
     {
-        site.configure_renderer(|renderer| renderer.add_template_dir(&self.template_path))
+        site.configure_renderer(|renderer| renderer.add_template_dir(self.0))
     }
 }
 

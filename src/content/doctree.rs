@@ -329,9 +329,9 @@ impl Display for FootnoteReference {
     }
 }
 
-impl From<&String> for FootnoteReference {
-    fn from(value: &String) -> Self {
-        FootnoteReference(value.clone())
+impl From<String> for FootnoteReference {
+    fn from(value: String) -> Self {
+        FootnoteReference(value)
     }
 }
 

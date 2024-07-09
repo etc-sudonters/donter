@@ -37,6 +37,6 @@ impl site::Loader for Loader {
         };
 
         let node = markdown::to_mdast(&buf, &opts).map_err(|e| Error::ParseError(e))?;
-        MarkdownPageBuilder::new(builder).build(&node)
+        MarkdownPageBuilder::new(builder, &opts).build(&node)
     }
 }

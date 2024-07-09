@@ -53,6 +53,12 @@ impl AsRef<path::Path> for Path {
     }
 }
 
+impl AsRef<Path> for Path {
+    fn as_ref(&self) -> &Path {
+        self
+    }
+}
+
 impl Path {
     pub fn impose(p: path::PathBuf) -> Option<Path> {
         if p.is_file() {
@@ -67,7 +73,6 @@ impl Path {
     pub fn as_file(self) -> Option<FilePath> {
         match self {
             Self::File(f) => Some(f),
-
             _ => None,
         }
     }

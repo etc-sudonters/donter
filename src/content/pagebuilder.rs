@@ -17,6 +17,7 @@ pub struct PageBuilder {
     pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,
+    pub(crate) summary: Option<doctree::Group>,
 }
 
 impl PageBuilder {
@@ -32,6 +33,7 @@ impl PageBuilder {
             page_status: PageStatus::Published,
             tpl_name: "page.html".to_owned(),
             meta: Default::default(),
+            summary: Default::default(),
         }
     }
 
@@ -93,6 +95,7 @@ impl PageBuilder {
                 status: self.page_status,
                 tpl_name: self.tpl_name,
                 meta: self.meta,
+                summary: self.summary,
             },
             content: PageContents {
                 content: self.contents,
