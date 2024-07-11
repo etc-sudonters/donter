@@ -149,7 +149,7 @@ where
         let tpl = renderer.get_template(&self.metadata.tpl_name)?;
 
         let content = tpl.render(
-            minijinja::context! { archive => self.create_renderable_archive(corpus, site) },
+            minijinja::context! { archive => Vec::from_iter(self.create_renderable_archive(corpus, site).iter()) }
         )?;
         site.add_page(
             unsafe { FilePath::new("tags.html") },

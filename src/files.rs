@@ -100,6 +100,12 @@ impl From<DirPath> for Path {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FilePath(path::PathBuf);
 
+impl Display for FilePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_string_lossy())
+    }
+}
+
 impl Deref for FilePath {
     type Target = path::PathBuf;
     fn deref(&self) -> &Self::Target {
@@ -117,34 +123,6 @@ impl FilePath {
     }
 }
 
-impl From<FilePath> for String {
-    fn from(value: FilePath) -> Self {
-        value
-            .0
-            .into_os_string()
-            .into_string()
-            .expect("aaaaahh! weird file name")
-    }
-}
-
-impl From<&FilePath> for String {
-    fn from(value: &FilePath) -> Self {
-        String::from(value.clone())
-    }
-}
-
-impl Display for FilePath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", String::from(self))
-    }
-}
-
-impl AsRef<str> for FilePath {
-    fn as_ref(&self) -> &str {
-        self.0.as_os_str().to_str().unwrap()
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DirPath(path::PathBuf);
 
@@ -155,16 +133,6 @@ impl DirPath {
 
     pub fn join<P: AsRef<path::Path>>(&self, path: P) -> path::PathBuf {
         self.0.join(path)
-    }
-}
-
-impl From<DirPath> for String {
-    fn from(value: DirPath) -> Self {
-        value
-            .0
-            .into_os_string()
-            .into_string()
-            .expect("aaaaahh! weird file name")
     }
 }
 

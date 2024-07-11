@@ -10,7 +10,7 @@ impl site::Processor for StaticFiles {
         &mut self,
         renderer: &mut minijinja::Environment<'_>,
         corpus: &content::Corpus,
-        site: &mut site::RenderedSite,
+        site: &mut site::rendered::RenderedSite,
     ) -> crate::Result<()> {
         Ok(())
     }
