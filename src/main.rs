@@ -3,6 +3,7 @@ mod cli;
 mod config;
 mod content;
 mod files;
+mod ids;
 mod jinja;
 mod md;
 mod processors;
@@ -16,6 +17,7 @@ use clap::Parser;
 use content::Origin;
 use files::FilePath;
 use processors::{Archive, DateArchivist, TagArchivist, TagSorting};
+use site::PageTemplate;
 use site::RenderedPageMetadata;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -37,19 +39,15 @@ fn main() -> Result<()> {
         .with(md::Md)
         .with(Archive::new(
             TagArchivist(TagSorting::Alphabetical),
-            RenderedPageMetadata {
-                title: "Tag Archive".to_owned(),
-                origin: Origin(unsafe { files::FilePath::new("tags.html") }),
+            PageTemplate {
+                title: "Tag Archive",
                 url: unsafe { files::FilePath::new("tags.html") },
-                when: None,
-                status: content::PageStatus::Published,
-                tpl_name: "tags.html".to_owned(),
-                summary: "".to_owned(),
+                template: "tags.html",
             },
         ))
         .create()?;
 
-    let mut corpus = content::Corpus::default();
+    let mut corpus = content::Corpus::create(1312);
     app.load(&conf.content.base(), &mut corpus)?;
     app.process(&mut corpus)?;
     let mut writer = conf.output.writer()?;

@@ -1,3 +1,4 @@
+use crate::{content::CorpusEntry, ids};
 use std::{
     collections::{
         hash_map::{Entry, OccupiedEntry, VacantEntry},
@@ -9,13 +10,71 @@ use std::{
 use crate::{
     content::{self, Metadata},
     files::{self, FilePath},
-    site::{self, RenderedPage, RenderedPageMetadata},
+    site::{self, PageTemplate, RenderedPage, RenderedPageMetadata},
 };
+
+pub struct Buckets<K, V>(HashMap<K, Vec<V>>)
+where
+    K: Eq + Hash;
+
+impl<K, V> Default for Buckets<K, V>
+where
+    K: Eq + Hash,
+{
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<K, V> Buckets<K, V>
+where
+    K: Eq + Hash,
+{
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(HashMap::with_capacity(cap))
+    }
+
+    pub fn push(&mut self, key: K, value: V) {
+        self.0.entry(key).or_insert_with(Vec::new).push(value);
+    }
+
+    pub fn insert(&mut self, key: K, mut value: Vec<V>) {
+        match self.0.entry(key) {
+            Entry::Vacant(v) => {
+                v.insert(value);
+            }
+            Entry::Occupied(o) => {
+                o.into_mut().append(&mut value);
+            }
+        }
+    }
+
+    pub fn buckets(&self) -> impl Iterator<Item = (&K, &Vec<V>)> {
+        self.0.iter()
+    }
+
+    pub fn into_buckets(self) -> impl Iterator<Item = (K, Vec<V>)> {
+        self.0.into_iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 #[derive(Debug, serde::Serialize)]
 pub struct ArchiveEntry<'a> {
-    summary: &'a str,
+    summary: Option<&'a str>,
     title: &'a str,
+}
+
+impl<'a> From<&'a site::RenderedPage<'a>> for ArchiveEntry<'a> {
+    fn from(page: &'a site::RenderedPage<'a>) -> Self {
+        Self {
+            title: &page.metadata().title,
+            summary: page.metadata().summary.as_deref(),
+        }
+    }
 }
 
 pub struct DateArchivist<'a>(pub &'a str);
@@ -35,13 +94,10 @@ impl<'a> Archivist for DateArchivist<'a> {
     fn archive_page(
         &mut self,
         page: &content::Page,
-        buckets: &mut HashMap<String, Vec<content::Origin>>,
+        buckets: &mut Buckets<String, ids::Id<content::CorpusEntry>>,
     ) -> crate::Result<()> {
         if let Some(when) = &page.meta.when {
-            buckets
-                .entry(self.format_date(when))
-                .or_insert_with(Vec::new)
-                .push(page.meta.origin.clone())
+            buckets.push(self.format_date(when), page.id.clone());
         }
 
         Ok(())
@@ -52,17 +108,14 @@ impl Archivist for TagArchivist {
     fn archive_page(
         &mut self,
         page: &content::Page,
-        buckets: &mut HashMap<String, Vec<content::Origin>>,
+        buckets: &mut Buckets<String, ids::Id<content::CorpusEntry>>,
     ) -> crate::Result<()> {
         if let Some(Metadata::List(tags)) = page.meta.meta.get("tags") {
             for tag in tags.iter().filter_map(|t| match t {
                 Metadata::Str(s) => Some(s.to_lowercase()),
                 _ => None,
             }) {
-                buckets
-                    .entry(tag)
-                    .or_insert_with(Vec::new)
-                    .push(page.meta.origin.clone())
+                buckets.push(tag, page.id.clone());
             }
         }
 
@@ -70,55 +123,51 @@ impl Archivist for TagArchivist {
     }
 }
 
-pub struct Archive<A>
+pub struct Archive<'a, A>
 where
     A: Archivist,
 {
-    buckets: HashMap<String, Vec<content::Origin>>,
+    buckets: Buckets<String, ids::Id<content::CorpusEntry>>,
     archivist: A,
-    metadata: RenderedPageMetadata,
+    template: PageTemplate<'a>,
 }
 
 pub trait Archivist {
     fn archive_page(
         &mut self,
         page: &content::Page,
-        buckets: &mut HashMap<String, Vec<content::Origin>>,
+        buckets: &mut Buckets<String, ids::Id<content::CorpusEntry>>,
     ) -> crate::Result<()>;
 }
 
-impl<A> Archive<A>
+impl<'a, A> Archive<'a, A>
 where
     A: Archivist,
 {
-    pub fn new(archivist: A, metadata: RenderedPageMetadata) -> Self {
+    pub fn new(archivist: A, metadata: PageTemplate<'a>) -> Self {
         Self {
             archivist,
-            metadata,
+            template: metadata,
             buckets: Default::default(),
         }
     }
 
-    fn create_renderable_archive<'call, 'render>(
-        &'call self,
-        corpus: &'render content::Corpus,
-        site: &'render site::RenderedSite,
-    ) -> HashMap<&str, Vec<ArchiveEntry<'_>>>
-    where
-        'render: 'call,
-    {
-        let mut buckets = HashMap::with_capacity(self.buckets.len());
+    fn create_renderable_archive(
+        &self,
+        site: &'a site::RenderedSite<'_>,
+    ) -> Buckets<&str, ArchiveEntry<'a>> {
+        let mut buckets = Buckets::with_capacity(self.buckets.len());
 
-        for (k, v) in self.buckets.iter() {
+        for (k, v) in self.buckets.buckets() {
             buckets.insert(
                 k.as_str(),
                 v.iter()
-                    .map(|o| {
-                        let page = site.get_page_by_origin(o).unwrap();
-                        ArchiveEntry {
+                    .filter_map(|o| match site.get_by_origin(o) {
+                        Some(site::Writable::Page(page)) => Some(ArchiveEntry {
                             title: &page.metadata().title,
-                            summary: &page.metadata().summary,
-                        }
+                            summary: page.metadata().summary.as_deref(),
+                        }),
+                        _ => None,
                     })
                     .collect(),
             );
@@ -128,7 +177,7 @@ where
     }
 }
 
-impl<A> site::Processor for Archive<A>
+impl<'archive, A> site::Processor for Archive<'archive, A>
 where
     A: Archivist,
 {
@@ -140,21 +189,22 @@ where
         Ok(())
     }
 
-    fn site_render(
-        &mut self,
-        renderer: &mut minijinja::Environment<'_>,
+    fn site_render<'site, 'env>(
+        &'site mut self,
+        renderer: &mut minijinja::Environment<'env>,
         corpus: &content::Corpus,
-        site: &mut site::RenderedSite,
+        site: &mut site::RenderedSite<'site>,
     ) -> crate::Result<()> {
-        let tpl = renderer.get_template(&self.metadata.tpl_name)?;
+        let tpl = renderer.get_template(&self.template.template)?;
 
         let content = tpl.render(
-            minijinja::context! { archive => Vec::from_iter(self.create_renderable_archive(corpus, site).iter()) }
+            minijinja::context! { archive => Vec::from_iter(self.create_renderable_archive(site).into_buckets()) }
         )?;
-        site.add_page(
-            unsafe { FilePath::new("tags.html") },
-            RenderedPage::new(content.into_bytes(), self.metadata.clone()),
-        );
+
+        site.add_page(RenderedPage::new(
+            content.into_bytes(),
+            self.template.stamp(),
+        ));
         Ok(())
     }
 }

@@ -1,28 +1,52 @@
+use super::IncludedAsset;
 use super::SiteError;
+use super::Writable;
 use crate::content;
+use crate::content::CorpusEntry;
 use crate::files;
+use crate::ids;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 
-pub struct RenderedPage {
+pub struct RenderedPage<'a> {
     content: VecDeque<u8>,
-    meta: RenderedPageMetadata,
+    meta: RenderedPageMetadata<'a>,
+}
+
+pub struct PageTemplate<'a> {
+    pub(crate) title: &'a str,
+    pub(crate) url: files::FilePath,
+    pub(crate) template: &'a str,
+}
+
+impl<'a> PageTemplate<'a> {
+    pub fn stamp<'b>(&'b self) -> RenderedPageMetadata<'b>
+    where
+        'a: 'b,
+    {
+        RenderedPageMetadata {
+            title: &self.title,
+            url: &self.url,
+            when: None,
+            summary: None,
+            origin: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct RenderedPageMetadata {
-    pub(crate) title: String,
-    pub(crate) origin: content::Origin,
-    pub(crate) url: files::FilePath,
-    pub(crate) when: Option<String>,
-    pub(crate) status: content::PageStatus,
-    pub(crate) tpl_name: String,
-    pub(crate) summary: String,
+pub struct RenderedPageMetadata<'a> {
+    pub(crate) origin: Option<ids::Id<CorpusEntry>>,
+    pub(crate) title: &'a str,
+    pub(crate) url: &'a files::FilePath,
+    pub(crate) when: Option<&'a str>,
+    pub(crate) summary: Option<String>,
 }
 
-impl RenderedPage {
-    pub fn new<I: Into<VecDeque<u8>>>(content: I, meta: RenderedPageMetadata) -> Self {
+impl<'a> RenderedPage<'a> {
+    pub fn new<I: Into<VecDeque<u8>>>(content: I, meta: RenderedPageMetadata<'a>) -> Self {
         RenderedPage {
             content: content.into(),
             meta,
@@ -42,74 +66,54 @@ impl RenderedPage {
     }
 }
 
-pub struct IncludedAsset(files::Path);
-
-impl IncludedAsset {
-    pub fn read(self) -> crate::Result<impl std::io::Read> {
-        Ok(std::fs::File::open(self.0)?)
-    }
-
-    pub fn path(self) -> files::Path {
-        self.0
-    }
+pub struct RenderedSite<'a> {
+    writables: HashMap<ids::Id<RenderedSite<'a>>, Writable<'a>>,
+    origins: HashMap<ids::Id<CorpusEntry>, ids::Id<RenderedSite<'a>>>,
+    ids: ids::IdPool<RenderedSite<'a>>,
 }
 
-pub enum Writable {
-    Page(RenderedPage),
-    Asset(IncludedAsset),
-}
-
-pub struct RenderedSite {
-    writables: HashMap<files::Path, Writable>,
-    origins: HashMap<content::Origin, files::Path>,
-}
-
-impl RenderedSite {
-    pub fn new() -> RenderedSite {
+impl<'a> RenderedSite<'a> {
+    pub fn new() -> Self {
         Self {
             writables: Default::default(),
             origins: Default::default(),
+            ids: ids::IdPool::new(1312),
         }
     }
 
-    pub fn entries(self) -> impl std::iter::Iterator<Item = (files::Path, Writable)> {
+    pub fn add_page(&mut self, page: RenderedPage<'a>) {
+        let idx = self.ids.next();
+        if let Some(ref origin) = page.meta.origin {
+            self.origins.insert(origin.clone(), idx.clone());
+        }
+        self.writables.insert(idx, Writable::Page(page));
+    }
+
+    pub fn add_asset(&mut self, asset: IncludedAsset) {
+        self.writables
+            .insert(self.ids.next(), Writable::Asset(asset));
+    }
+
+    pub fn entries(
+        self,
+    ) -> impl std::iter::Iterator<Item = (ids::Id<RenderedSite<'a>>, Writable<'a>)> {
         self.writables.into_iter()
     }
 
-    pub fn get_page_by_origin(&self, origin: &content::Origin) -> Option<&RenderedPage> {
-        match self.origins.get(origin) {
+    pub fn get<K>(&self, id: K) -> Option<&Writable<'a>>
+    where
+        K: std::borrow::Borrow<ids::Id<RenderedSite<'a>>>,
+    {
+        self.writables.get(id.borrow())
+    }
+
+    pub fn get_by_origin<K>(&self, origin: K) -> Option<&Writable<'a>>
+    where
+        K: std::borrow::Borrow<ids::Id<CorpusEntry>>,
+    {
+        match self.origins.get(origin.borrow()) {
             None => None,
-            Some(dest) => match self.writables.get(dest).unwrap() {
-                Writable::Page(p) => Some(p),
-                _ => None,
-            },
-        }
-    }
-
-    pub fn add_page(&mut self, path: files::FilePath, content: RenderedPage) -> crate::Result<()> {
-        match self.writables.entry(path.clone().into()) {
-            Entry::Vacant(v) => {
-                let origin = &content.meta.origin;
-                self.origins.insert(origin.clone(), v.key().clone());
-
-                v.insert(Writable::Page(content));
-                Ok(())
-            }
-            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(o.key().clone()))),
-        }
-    }
-
-    pub fn add_static_asset(
-        &mut self,
-        path: files::Path,
-        content: &content::IncludedPath,
-    ) -> crate::Result<()> {
-        match self.writables.entry(path) {
-            Entry::Vacant(v) => {
-                v.insert(Writable::Asset(IncludedAsset(content.clone().into())));
-                Ok(())
-            }
-            Entry::Occupied(o) => Err(Box::new(SiteError::AlreadyOccupied(o.key().clone()))),
+            Some(dest) => self.writables.get(dest), // this will always be Some(...)
         }
     }
 }

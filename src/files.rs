@@ -60,13 +60,13 @@ impl AsRef<Path> for Path {
 }
 
 impl Path {
-    pub fn impose(p: path::PathBuf) -> Option<Path> {
+    pub fn impose(p: path::PathBuf) -> Result<Path, path::PathBuf> {
         if p.is_file() {
-            Some(Path::File(FilePath(p)))
+            Ok(Path::File(FilePath(p)))
         } else if p.is_dir() {
-            Some(Path::Dir(DirPath(p)))
+            Ok(Path::Dir(DirPath(p)))
         } else {
-            None
+            Err(p)
         }
     }
 
@@ -136,6 +136,31 @@ impl DirPath {
     }
 }
 
+#[derive(Debug)]
+pub enum PathError {
+    Unsupported(path::PathBuf),
+}
+
+impl std::fmt::Display for PathError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use PathError::*;
+        write!(f, "PathError::")?;
+        match self {
+            Unsupported(path) => write!(f, "Unsupported({})", path.to_string_lossy()),
+        }
+    }
+}
+
+impl std::error::Error for PathError {}
+
+impl From<path::PathBuf> for Path {
+    fn from(value: path::PathBuf) -> Self {
+        Path::impose(value)
+            .map_err(|e| PathError::Unsupported(e))
+            .unwrap()
+    }
+}
+
 impl AsRef<path::Path> for DirPath {
     fn as_ref(&self) -> &path::Path {
         AsRef::<path::Path>::as_ref(&self.0)
@@ -188,11 +213,11 @@ impl BreadthFirstWalker {
                 };
 
                 match Path::impose(entry.path()) {
-                    Some(p) => match p {
+                    Ok(p) => match p {
                         Path::File(f) => self.files.push(f),
                         Path::Dir(d) => self.dirs.push(d),
                     },
-                    None => {}
+                    _ => {}
                 }
             }
         }

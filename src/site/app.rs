@@ -1,3 +1,4 @@
+use super::IncludedAsset;
 use super::RenderedSite;
 use std::collections::VecDeque;
 
@@ -19,10 +20,15 @@ use crate::jinja;
 use crate::render::render_page;
 use crate::render::render_summary;
 
+pub struct AppConfig {
+    asset_base: files::DirPath,
+}
+
 pub struct App<'a> {
-    pub(crate) loaders: Vec<Box<dyn Loader + 'a>>,
-    pub(crate) processors: Vec<Box<dyn Processor + 'a>>,
-    pub(crate) renderer: minijinja::Environment<'a>,
+    loaders: Vec<Box<dyn Loader + 'a>>,
+    processors: Vec<Box<dyn Processor + 'a>>,
+    renderer: minijinja::Environment<'a>,
+    config: AppConfig,
 }
 
 impl<'env> App<'env> {
@@ -45,6 +51,9 @@ impl<'env> App<'env> {
             processors,
             loaders,
             renderer,
+            config: AppConfig {
+                asset_base: unsafe { files::DirPath::new("assets") },
+            },
         })
     }
 
@@ -56,14 +65,12 @@ impl<'env> App<'env> {
         for path in files::Walker::walk(path, files::RecursionBehavior::Dont) {
             for loader in self.loaders.iter_mut() {
                 if loader.accept(&path)? {
-                    let mut builder = content::PageBuilder::new(path.clone());
-
+                    let mut builder = corpus.make_page(path.clone());
                     loader.load(Box::new(std::fs::File::open(&path)?), &mut builder)?;
-
                     for processor in self.processors.iter_mut() {
                         processor.page_load(&mut builder)?;
                     }
-                    corpus.add_page(builder.build()?);
+                    corpus.add_page(builder)?;
                     break;
                 }
             }
@@ -71,7 +78,13 @@ impl<'env> App<'env> {
         Ok(())
     }
 
-    pub fn render_page(&mut self, page: &content::Page) -> crate::Result<RenderedPage> {
+    pub fn render_page<'a, 'b>(
+        &mut self,
+        page: &'a content::Page,
+    ) -> crate::Result<RenderedPage<'b>>
+    where
+        'a: 'b,
+    {
         let tpl = self
             .renderer
             .get_template(&page.meta.tpl_name)
@@ -94,24 +107,17 @@ impl<'env> App<'env> {
             RenderedPage::new(
                 VecDeque::from(rendered.into_bytes()),
                 RenderedPageMetadata {
-                    title: page.meta.title.clone(),
-                    origin: page.meta.origin.clone(),
-                    url: page.meta.url.clone(),
-                    when: page.meta.when.clone(),
-                    status: page.meta.status,
-                    tpl_name: page.meta.tpl_name.clone(),
-                    summary: page
-                        .meta
-                        .summary
-                        .as_ref()
-                        .map(|summ| {
-                            render_summary(
-                                summ.children(),
-                                &page.content.footnotes,
-                                &page.content.hrefs,
-                            )
-                        })
-                        .unwrap_or(Default::default()),
+                    origin: Some(page.id.clone()),
+                    title: &page.meta.title,
+                    url: &page.meta.url,
+                    when: page.meta.when.as_deref(),
+                    summary: page.meta.summary.as_ref().map(|summ| {
+                        render_summary(
+                            summ.children(),
+                            &page.content.footnotes,
+                            &page.content.hrefs,
+                        )
+                    }),
                 },
             )
         })?)
@@ -125,7 +131,10 @@ impl<'env> App<'env> {
         Ok(())
     }
 
-    pub fn render(&mut self, corpus: &content::Corpus) -> crate::Result<RenderedSite> {
+    pub fn render<'a>(&'a mut self, corpus: &'a content::Corpus) -> crate::Result<RenderedSite<'a>>
+    where
+        'env: 'a,
+    {
         let mut site = RenderedSite::new();
 
         for entry in corpus.entries() {
@@ -133,10 +142,14 @@ impl<'env> App<'env> {
                 content::CorpusEntry::Page(p) => {
                     let dest = p.meta.url.clone();
                     let page = self.render_page(&p)?;
-                    site.add_page(dest, page)?;
+                    //page.metadata().origin = Some(p.id);
+                    site.add_page(page);
                 }
                 content::CorpusEntry::StaticAsset(asset) => {
-                    site.add_static_asset(asset.clone().into(), asset)?;
+                    site.add_asset(IncludedAsset::create(
+                        asset,
+                        self.config.asset_base.join(asset),
+                    ));
                 }
             }
         }

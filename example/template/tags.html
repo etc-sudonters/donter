@@ -8,7 +8,7 @@
         <article>
           <h2>{{ page.title }}</h2>
           {% if page.summary %}
-          <p> {{ page.summary | safe }} </p>
+          {{ page.summary | safe }}
           {% endif %}
         </article>
     {% endfor %}

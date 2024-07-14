@@ -13,10 +13,8 @@ impl Files {
         Ok(Self(dir))
     }
 
-    fn create_path(&self, path: files::Path) -> crate::Result<path::PathBuf> {
+    fn create_path<P: AsRef<path::Path>>(&self, path: P) -> crate::Result<path::PathBuf> {
         let mut path = self.0.join(path);
-
-        println!("writing {}", path.to_string_lossy());
         match path.extension() {
             None => fs::create_dir_all(&path)?,
             Some(_) => {
@@ -32,14 +30,10 @@ impl Files {
 }
 
 impl site::Writer for Files {
-    fn write_static_asset(
-        &mut self,
-        path: files::Path,
-        asset: site::IncludedAsset,
-    ) -> crate::Result<()> {
+    fn write_static_asset(&mut self, asset: site::IncludedAsset) -> crate::Result<()> {
         use files::Path::*;
-        let dest = self.create_path(path)?;
-        match asset.path() {
+        let dest = self.create_path(asset.destination())?;
+        match asset.source() {
             File(f) => {
                 fs::copy(f, dest)?;
             }
@@ -54,12 +48,8 @@ impl site::Writer for Files {
         Ok(())
     }
 
-    fn write_rendered_page(
-        &mut self,
-        path: files::FilePath,
-        page: site::RenderedPage,
-    ) -> crate::Result<()> {
-        let mut fh = File::create(self.create_path(path.into())?)?;
+    fn write_rendered_page(&mut self, page: site::RenderedPage) -> crate::Result<()> {
+        let mut fh = File::create(self.create_path(page.metadata().url)?)?;
         io::copy(&mut page.read(), &mut fh)?;
         Ok(())
     }

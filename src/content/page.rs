@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use crate::files;
+use crate::{files, ids};
 
-use super::{doctree, Definitions, Metadata, Origin};
+use super::{doctree, CorpusEntry, Definitions, Metadata, Origin};
 
 #[derive(Debug)]
 pub struct Page {
+    pub(crate) id: ids::Id<CorpusEntry>,
     pub(crate) meta: PageMetadata,
     pub(crate) content: PageContents,
 }

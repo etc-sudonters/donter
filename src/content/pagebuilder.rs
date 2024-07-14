@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use super::definitions::Definitions;
 use super::page::{Page, PageContents, PageMetadata, PageStatus};
-use super::Metadata;
 use super::{doctree, meta};
-use crate::files;
+use super::{CorpusEntry, Metadata};
+use crate::ids::Id;
+use crate::{files, ids};
 
 pub struct PageBuilder {
+    pub(crate) id: ids::Id<CorpusEntry>,
     pub(crate) title: String,
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
@@ -21,11 +23,12 @@ pub struct PageBuilder {
 }
 
 impl PageBuilder {
-    pub fn new<F: Into<files::FilePath>>(f: F) -> PageBuilder {
+    pub fn new<F: Into<files::FilePath>>(id: ids::Id<CorpusEntry>, f: F) -> PageBuilder {
         PageBuilder {
+            id,
+            filepath: f.into(),
             title: Default::default(),
             contents: Default::default(),
-            filepath: f.into(),
             url_path: Default::default(),
             notes: Default::default(),
             page_hrefs: Default::default(),
@@ -87,6 +90,7 @@ impl PageBuilder {
 
     pub fn build(mut self) -> crate::Result<Page> {
         Ok(Page {
+            id: self.id,
             meta: PageMetadata {
                 title: self.title,
                 origin: super::Origin(self.filepath),

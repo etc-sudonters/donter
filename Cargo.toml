@@ -11,3 +11,4 @@ url = { version = "2", features = ["serde"]}
 tar = { version = "0.4.41" }
 clap = { version = "4.5.8", features = ["derive"]}
 yaml-rust2 = { version = "0.8.1" }
+chrono = { version = "0.4.38", features = ["serde"] }
