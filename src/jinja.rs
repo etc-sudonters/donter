@@ -1,12 +1,12 @@
-use std::{io::Read, mem};
+use std::{cell::RefCell, io::Read, mem, rc::Rc};
 
 use minijinja;
 
 use crate::{files, site};
 
-pub struct Jinja<'a>(pub &'a files::DirPath);
+pub struct JinjaConfiguration<'a>(pub &'a files::DirPath);
 
-impl<'a> site::Processor for Jinja<'a> {
+impl<'a> site::Processor for JinjaConfiguration<'a> {
     fn initialize<'call, 'init>(
         &'call mut self,
         site: &'call mut site::Initializer<'init, '_>,
@@ -59,11 +59,57 @@ impl<'builder, 'env> Builder<'builder, 'env> {
     }
 }
 
+pub struct Renderer<'rendering, 'env>
+where
+    'env: 'rendering,
+{
+    r: &'rendering Rc<RefCell<minijinja::Environment<'env>>>,
+    globals: RenderContext,
+}
+
+impl<'rendering, 'env> Renderer<'rendering, 'env>
+where
+    'env: 'rendering,
+{
+    pub fn new(
+        r: &'rendering Rc<RefCell<minijinja::Environment<'env>>>,
+        globals: RenderContext,
+    ) -> Self {
+        Self { r, globals }
+    }
+
+    pub fn render_template(
+        &mut self,
+        template: &str,
+        mut values: RenderContext,
+    ) -> crate::Result<String> {
+        let eng = self.r.borrow_mut();
+        let tpl = eng.get_template(template)?;
+        values.merge(minijinja::context! { globals => &self.globals });
+        Ok(tpl.render(values)?)
+    }
+
+    pub fn values<F>(&mut self, f: F) -> crate::Result<()>
+    where
+        F: FnOnce(&mut RenderContext) -> crate::Result<()>,
+    {
+        f(&mut self.globals)
+    }
+}
+
 pub struct RenderContext {
     ctx: minijinja::Value,
 }
 
 impl RenderContext {
+    pub fn new(ctx: minijinja::Value) -> Self {
+        Self { ctx }
+    }
+
+    pub fn empty() -> Self {
+        Self::new(minijinja::Value::default())
+    }
+
     pub fn merge(&mut self, merge: minijinja::Value) {
         self.ctx = minijinja::context!(..merge, ..self.take());
     }
@@ -72,12 +118,6 @@ impl RenderContext {
         let mut ctx = Default::default();
         mem::swap(&mut self.ctx, &mut ctx);
         ctx
-    }
-}
-
-impl RenderContext {
-    pub fn new(ctx: minijinja::Value) -> Self {
-        Self { ctx }
     }
 }
 

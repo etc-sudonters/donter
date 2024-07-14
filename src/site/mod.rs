@@ -29,6 +29,8 @@ pub use rendered::PageTemplate;
 pub use rendered::RenderedPage;
 pub use rendered::RenderedPageMetadata;
 pub use rendered::RenderedSite;
+pub use rendered::RenderingPage;
+pub use rendered::RenderingSite;
 
 #[derive(Debug)]
 pub enum SiteError {

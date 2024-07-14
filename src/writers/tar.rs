@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{borrow::Borrow, io::Write};
 
 use crate::{files, site};
 
@@ -11,7 +11,7 @@ impl<W: Write> site::Writer for Tar<W> {
         let mut header = tar::Header::new_gnu();
         header.set_size(page.size());
         header.set_mode(420); // 644
-        let dest = page.metadata().url.clone();
+        let dest: files::FilePath = page.metadata().url.clone().into_owned();
         self.archive.append_data(&mut header, dest, page.read())?;
         Ok(())
     }

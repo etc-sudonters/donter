@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     fs::{self, File},
     io, path,
 };
@@ -49,7 +50,9 @@ impl site::Writer for Files {
     }
 
     fn write_rendered_page(&mut self, page: site::RenderedPage) -> crate::Result<()> {
-        let mut fh = File::create(self.create_path(page.metadata().url)?)?;
+        let dest: &files::FilePath = page.metadata().url.borrow();
+        let path = self.create_path(dest)?;
+        let mut fh = File::create(path)?;
         io::copy(&mut page.read(), &mut fh)?;
         Ok(())
     }

@@ -1,3 +1,5 @@
+use url::form_urlencoded::Target;
+
 use super::IncludedAsset;
 use super::SiteError;
 use super::Writable;
@@ -5,14 +7,116 @@ use crate::content;
 use crate::content::CorpusEntry;
 use crate::files;
 use crate::ids;
+use crate::jinja;
+use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::ops::DerefMut;
 
-pub struct RenderedPage<'a> {
+pub struct RenderingSite<'rendering, 'site, 'env>
+where
+    'env: 'site,
+    'site: 'rendering,
+{
+    renderer: jinja::Renderer<'rendering, 'env>,
+    ids: ids::IdPool<RenderedSite<'site>>,
+    site: RenderedSite<'site>,
+}
+
+impl<'rendering, 'site, 'env> RenderingSite<'rendering, 'site, 'env>
+where
+    'env: 'site,
+    'site: 'rendering,
+{
+    pub fn new(renderer: jinja::Renderer<'rendering, 'env>) -> Self {
+        Self {
+            ids: ids::IdPool::new(1),
+            site: RenderedSite::new(),
+            renderer,
+        }
+    }
+
+    pub fn render(self) -> RenderedSite<'site> {
+        self.site
+    }
+
+    pub fn page<'page>(&mut self, template: &'page str) -> RenderingPage<'page, 'site> {
+        RenderingPage {
+            id: self.ids.next(),
+            tpl: template,
+            v: jinja::RenderContext::empty(),
+        }
+    }
+
+    pub fn render_page<'page, M: Into<RenderedPageMetadata<'site>>>(
+        &'page mut self,
+        meta: M,
+        page: RenderingPage<'page, 'site>,
+    ) -> crate::Result<()>
+    where
+        'site: 'page,
+    {
+        let rendered = self.renderer.render_template(&page.tpl, page.v)?;
+        let page = RenderedPage {
+            id: page.id,
+            content: VecDeque::from(rendered.into_bytes()),
+            meta: meta.into(),
+        };
+        if let Some(ref origin) = page.meta.origin {
+            self.site.origins.insert(origin.clone(), page.id.clone());
+        }
+        self.site
+            .writables
+            .insert(page.id.clone(), Writable::Page(page));
+        Ok(())
+    }
+
+    pub fn add_asset(&mut self, asset: IncludedAsset) {
+        self.site
+            .writables
+            .insert(self.ids.next(), Writable::Asset(asset));
+    }
+
+    pub fn get_by_origin<K>(&self, origin: K) -> Option<&Writable<'site>>
+    where
+        K: std::borrow::Borrow<ids::Id<CorpusEntry>>,
+    {
+        match self.site.origins.get(origin.borrow()) {
+            None => None,
+            Some(dest) => self.site.writables.get(dest), // this will always be Some(...)
+        }
+    }
+}
+
+pub struct RenderingPage<'page, 'site>
+where
+    'site: 'page,
+{
+    id: ids::Id<RenderedSite<'site>>,
+    tpl: &'page str,
+    v: jinja::RenderContext,
+}
+
+impl<'page, 'site> RenderingPage<'page, 'site>
+where
+    'site: 'page,
+{
+    pub fn values(&mut self) -> &mut jinja::RenderContext {
+        &mut self.v
+    }
+}
+
+pub struct RenderedSite<'site> {
+    writables: HashMap<ids::Id<RenderedSite<'site>>, Writable<'site>>,
+    origins: HashMap<ids::Id<CorpusEntry>, ids::Id<RenderedSite<'site>>>,
+}
+
+pub struct RenderedPage<'site> {
+    id: ids::Id<RenderedSite<'site>>,
     content: VecDeque<u8>,
-    meta: RenderedPageMetadata<'a>,
+    meta: RenderedPageMetadata<'site>,
 }
 
 pub struct PageTemplate<'a> {
@@ -21,14 +125,33 @@ pub struct PageTemplate<'a> {
     pub(crate) template: &'a str,
 }
 
+#[derive(Debug, Clone)]
+pub struct RenderedPageMetadata<'site> {
+    pub(crate) origin: Option<ids::Id<CorpusEntry>>,
+    pub(crate) title: Cow<'site, str>,
+    pub(crate) url: Cow<'site, files::FilePath>,
+    pub(crate) when: Option<Cow<'site, str>>,
+    pub(crate) summary: Option<String>,
+}
+
 impl<'a> PageTemplate<'a> {
-    pub fn stamp<'b>(&'b self) -> RenderedPageMetadata<'b>
+    pub fn borrow<'b>(&'b self) -> RenderedPageMetadata<'b>
     where
         'a: 'b,
     {
         RenderedPageMetadata {
-            title: &self.title,
-            url: &self.url,
+            title: Cow::Borrowed(&self.title),
+            url: Cow::Borrowed(&self.url),
+            when: None,
+            summary: None,
+            origin: None,
+        }
+    }
+
+    pub fn stamp<'b>(&self) -> RenderedPageMetadata<'b> {
+        RenderedPageMetadata {
+            title: Cow::Owned(self.title.to_owned()),
+            url: Cow::Owned(self.url.clone()),
             when: None,
             summary: None,
             origin: None,
@@ -36,23 +159,7 @@ impl<'a> PageTemplate<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RenderedPageMetadata<'a> {
-    pub(crate) origin: Option<ids::Id<CorpusEntry>>,
-    pub(crate) title: &'a str,
-    pub(crate) url: &'a files::FilePath,
-    pub(crate) when: Option<&'a str>,
-    pub(crate) summary: Option<String>,
-}
-
-impl<'a> RenderedPage<'a> {
-    pub fn new<I: Into<VecDeque<u8>>>(content: I, meta: RenderedPageMetadata<'a>) -> Self {
-        RenderedPage {
-            content: content.into(),
-            meta,
-        }
-    }
-
+impl<'site> RenderedPage<'site> {
     pub fn read(self) -> impl std::io::Read {
         self.content
     }
@@ -66,54 +173,24 @@ impl<'a> RenderedPage<'a> {
     }
 }
 
-pub struct RenderedSite<'a> {
-    writables: HashMap<ids::Id<RenderedSite<'a>>, Writable<'a>>,
-    origins: HashMap<ids::Id<CorpusEntry>, ids::Id<RenderedSite<'a>>>,
-    ids: ids::IdPool<RenderedSite<'a>>,
-}
-
-impl<'a> RenderedSite<'a> {
+impl<'env> RenderedSite<'env> {
     pub fn new() -> Self {
         Self {
             writables: Default::default(),
             origins: Default::default(),
-            ids: ids::IdPool::new(1312),
         }
-    }
-
-    pub fn add_page(&mut self, page: RenderedPage<'a>) {
-        let idx = self.ids.next();
-        if let Some(ref origin) = page.meta.origin {
-            self.origins.insert(origin.clone(), idx.clone());
-        }
-        self.writables.insert(idx, Writable::Page(page));
-    }
-
-    pub fn add_asset(&mut self, asset: IncludedAsset) {
-        self.writables
-            .insert(self.ids.next(), Writable::Asset(asset));
     }
 
     pub fn entries(
         self,
-    ) -> impl std::iter::Iterator<Item = (ids::Id<RenderedSite<'a>>, Writable<'a>)> {
+    ) -> impl std::iter::Iterator<Item = (ids::Id<RenderedSite<'env>>, Writable<'env>)> {
         self.writables.into_iter()
     }
 
-    pub fn get<K>(&self, id: K) -> Option<&Writable<'a>>
+    pub fn get<K>(&self, id: K) -> Option<&Writable<'env>>
     where
-        K: std::borrow::Borrow<ids::Id<RenderedSite<'a>>>,
+        K: std::borrow::Borrow<ids::Id<RenderedSite<'env>>>,
     {
         self.writables.get(id.borrow())
-    }
-
-    pub fn get_by_origin<K>(&self, origin: K) -> Option<&Writable<'a>>
-    where
-        K: std::borrow::Borrow<ids::Id<CorpusEntry>>,
-    {
-        match self.origins.get(origin.borrow()) {
-            None => None,
-            Some(dest) => self.writables.get(dest), // this will always be Some(...)
-        }
     }
 }

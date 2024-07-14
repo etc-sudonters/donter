@@ -1,6 +1,12 @@
+use super::rendered::RenderingSite;
 use super::IncludedAsset;
 use super::RenderedSite;
+use super::RenderingPage;
+use std::borrow::BorrowMut;
+use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 use super::RenderedPageMetadata;
 
@@ -27,7 +33,7 @@ pub struct AppConfig {
 pub struct App<'a> {
     loaders: Vec<Box<dyn Loader + 'a>>,
     processors: Vec<Box<dyn Processor + 'a>>,
-    renderer: minijinja::Environment<'a>,
+    renderer: Rc<RefCell<minijinja::Environment<'a>>>,
     config: AppConfig,
 }
 
@@ -50,7 +56,7 @@ impl<'env> App<'env> {
         Ok(App {
             processors,
             loaders,
-            renderer,
+            renderer: Rc::new(RefCell::new(renderer)),
             config: AppConfig {
                 asset_base: unsafe { files::DirPath::new("assets") },
             },
@@ -78,24 +84,18 @@ impl<'env> App<'env> {
         Ok(())
     }
 
-    pub fn render_page<'a, 'b>(
-        &mut self,
-        page: &'a content::Page,
-    ) -> crate::Result<RenderedPage<'b>>
+    pub fn render_page<'rendering, 'site>(
+        &'rendering self,
+        page: &'site content::Page,
+        site: &mut RenderingSite<'rendering, 'site, 'env>,
+    ) -> crate::Result<()>
     where
-        'a: 'b,
+        'env: 'site,
+        'site: 'rendering,
     {
-        let tpl = self
-            .renderer
-            .get_template(&page.meta.tpl_name)
-            .map_err(|e| Box::new(e))?;
+        let mut rendering = site.page(&page.meta.tpl_name);
 
-        let mut ctx = jinja::RenderContext::new(minijinja::Value::default());
-        for processor in self.processors.iter_mut() {
-            processor.page_render(&page, &mut ctx)?;
-        }
-
-        ctx.merge(minijinja::context! {
+        rendering.values().merge(minijinja::context! {
           page => minijinja::context!{
             content => minijinja::Value::from_safe_string(render_page(&page.content)),
             title => page.meta.title,
@@ -103,24 +103,27 @@ impl<'env> App<'env> {
           }
         });
 
-        Ok(tpl.render(ctx).map(|rendered| {
-            RenderedPage::new(
-                VecDeque::from(rendered.into_bytes()),
-                RenderedPageMetadata {
-                    origin: Some(page.id.clone()),
-                    title: &page.meta.title,
-                    url: &page.meta.url,
-                    when: page.meta.when.as_deref(),
-                    summary: page.meta.summary.as_ref().map(|summ| {
-                        render_summary(
-                            summ.children(),
-                            &page.content.footnotes,
-                            &page.content.hrefs,
-                        )
-                    }),
-                },
-            )
-        })?)
+        for processor in self.processors.iter() {
+            processor.page_render(page, &mut rendering)?;
+        }
+
+        let meta = RenderedPageMetadata {
+            origin: Some(page.id.clone()),
+            title: Cow::Borrowed(&page.meta.title),
+            url: Cow::Borrowed(&page.meta.url),
+            when: page.meta.when.as_deref().map(Cow::Borrowed),
+            summary: page.meta.summary.as_ref().map(|summ| {
+                render_summary(
+                    summ.children(),
+                    &page.content.footnotes,
+                    &page.content.hrefs,
+                )
+            }),
+        };
+
+        site.render_page(meta, rendering)?;
+
+        Ok(())
     }
 
     pub fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
@@ -131,19 +134,24 @@ impl<'env> App<'env> {
         Ok(())
     }
 
-    pub fn render<'a>(&'a mut self, corpus: &'a content::Corpus) -> crate::Result<RenderedSite<'a>>
+    pub fn render<'render, 'site>(
+        &'render self,
+        corpus: &'site content::Corpus,
+    ) -> crate::Result<RenderedSite<'site>>
     where
-        'env: 'a,
+        'env: 'site,
+        'site: 'render,
     {
-        let mut site = RenderedSite::new();
+        let mut globals = jinja::RenderContext::empty();
+        for processor in self.processors.iter() {
+            processor.global_render_context(&mut globals)?;
+        }
+        let mut site = RenderingSite::new(jinja::Renderer::new(&self.renderer, globals));
 
         for entry in corpus.entries() {
             match entry {
                 content::CorpusEntry::Page(p) => {
-                    let dest = p.meta.url.clone();
-                    let page = self.render_page(&p)?;
-                    //page.metadata().origin = Some(p.id);
-                    site.add_page(page);
+                    self.render_page(&p, &mut site)?;
                 }
                 content::CorpusEntry::StaticAsset(asset) => {
                     site.add_asset(IncludedAsset::create(
@@ -154,11 +162,11 @@ impl<'env> App<'env> {
             }
         }
 
-        for processor in self.processors.iter_mut() {
-            processor.site_render(&mut self.renderer, &corpus, &mut site)?;
+        for processor in self.processors.iter() {
+            processor.site_render(&corpus, &mut site)?;
         }
 
-        Ok(site)
+        Ok(site.render())
     }
 
     pub fn finalize(&mut self) -> crate::Result<()> {

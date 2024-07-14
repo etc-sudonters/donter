@@ -2,17 +2,21 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     content::{self, Metadata},
-    files, site,
+    files,
+    site::{self, RenderingPage},
 };
 
 pub struct Tags;
 
 impl site::Processor for Tags {
-    fn page_render(
-        &mut self,
+    fn page_render<'render, 'site>(
+        &self,
         page: &content::Page,
-        ctx: &mut crate::jinja::RenderContext,
-    ) -> crate::Result<()> {
+        rendering: &mut RenderingPage<'render, 'site>,
+    ) -> crate::Result<()>
+    where
+        'site: 'render,
+    {
         if let Some(Metadata::List(lst)) = page.meta.meta.get("tags") {
             let mut tags = Vec::with_capacity(lst.len());
             for tag in lst.iter() {
@@ -21,7 +25,7 @@ impl site::Processor for Tags {
                 }
             }
 
-            ctx.merge(minijinja::context! {tags => tags});
+            rendering.values().merge(minijinja::context! {tags => tags});
         }
 
         Ok(())

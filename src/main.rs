@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         .with_when(conf.output.clean, || {
             processors::Cleaner(conf.output.output.clone())
         })
-        .with(jinja::Jinja(&conf.site.templates))
+        .with(jinja::JinjaConfiguration(&conf.site.templates))
         .with(md::Md)
         .with(Archive::new(
             TagArchivist(TagSorting::Alphabetical),

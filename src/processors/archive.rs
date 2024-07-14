@@ -1,4 +1,4 @@
-use crate::{content::CorpusEntry, ids};
+use crate::{content::CorpusEntry, ids, jinja};
 use std::{
     collections::{
         hash_map::{Entry, OccupiedEntry, VacantEntry},
@@ -151,11 +151,26 @@ where
             buckets: Default::default(),
         }
     }
+}
 
-    fn create_renderable_archive(
+impl<'archive, A> site::Processor for Archive<'archive, A>
+where
+    A: Archivist,
+{
+    fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
+        for page in corpus.pages() {
+            self.archivist.archive_page(page, &mut self.buckets)?
+        }
+
+        Ok(())
+    }
+
+    fn site_render<'site>(
         &self,
-        site: &'a site::RenderedSite<'_>,
-    ) -> Buckets<&str, ArchiveEntry<'a>> {
+        corpus: &'site content::Corpus,
+        site: &mut site::RenderingSite<'_, 'site, '_>,
+    ) -> crate::Result<()> {
+        let mut page = site.page(&self.template.template);
         let mut buckets = Buckets::with_capacity(self.buckets.len());
 
         for (k, v) in self.buckets.buckets() {
@@ -173,38 +188,12 @@ where
             );
         }
 
-        buckets
-    }
-}
+        let archives = Vec::from_iter(buckets.into_buckets());
+        page.values()
+            .merge(minijinja::context! { archive =>  archives });
+        let meta = self.template.stamp();
+        site.render_page(meta, page)?;
 
-impl<'archive, A> site::Processor for Archive<'archive, A>
-where
-    A: Archivist,
-{
-    fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
-        for page in corpus.pages() {
-            self.archivist.archive_page(page, &mut self.buckets)?
-        }
-
-        Ok(())
-    }
-
-    fn site_render<'site, 'env>(
-        &'site mut self,
-        renderer: &mut minijinja::Environment<'env>,
-        corpus: &content::Corpus,
-        site: &mut site::RenderedSite<'site>,
-    ) -> crate::Result<()> {
-        let tpl = renderer.get_template(&self.template.template)?;
-
-        let content = tpl.render(
-            minijinja::context! { archive => Vec::from_iter(self.create_renderable_archive(site).into_buckets()) }
-        )?;
-
-        site.add_page(RenderedPage::new(
-            content.into_bytes(),
-            self.template.stamp(),
-        ));
         Ok(())
     }
 }

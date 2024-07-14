@@ -1,13 +1,19 @@
-use crate::{content::doctree::Element, site};
+use crate::{
+    content::doctree::Element,
+    site::{self, RenderingPage},
+};
 
 pub struct TableOfContents;
 
 impl site::Processor for TableOfContents {
-    fn page_render(
-        &mut self,
+    fn page_render<'render, 'site>(
+        &self,
         page: &crate::content::Page,
-        ctx: &mut crate::jinja::RenderContext,
-    ) -> crate::Result<()> {
+        rendering: &mut RenderingPage<'render, 'site>,
+    ) -> crate::Result<()>
+    where
+        'site: 'render,
+    {
         todo!()
     }
 }

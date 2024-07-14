@@ -3,6 +3,8 @@ use super::asset::Writable;
 use super::initializer;
 use super::rendered::RenderedPage;
 use super::rendered::RenderedSite;
+use super::rendered::RenderingPage;
+use super::rendered::RenderingSite;
 use crate::content;
 use crate::files;
 use crate::jinja;
@@ -39,15 +41,25 @@ pub trait Processor {
         Ok(())
     }
 
-    fn page_render(&mut self, page: &content::Page, ctx: &mut jinja::RenderContext) -> Result<()> {
+    fn global_render_context(&self, ctx: &mut jinja::RenderContext) -> Result<()> {
         Ok(())
     }
 
-    fn site_render<'site, 'env>(
-        &'site mut self,
-        renderer: &mut minijinja::Environment<'env>,
-        corpus: &content::Corpus,
-        site: &mut RenderedSite<'site>,
+    fn page_render<'render, 'site>(
+        &self,
+        page: &'site content::Page,
+        rendering: &mut RenderingPage<'render, 'site>,
+    ) -> Result<()>
+    where
+        'site: 'render,
+    {
+        Ok(())
+    }
+
+    fn site_render<'site>(
+        &self,
+        corpus: &'site content::Corpus,
+        site: &mut RenderingSite<'_, 'site, '_>,
     ) -> Result<()> {
         Ok(())
     }
