@@ -60,13 +60,14 @@ impl AsRef<Path> for Path {
 }
 
 impl Path {
-    pub fn impose(p: path::PathBuf) -> Result<Path, path::PathBuf> {
-        if p.is_file() {
-            Ok(Path::File(FilePath(p)))
-        } else if p.is_dir() {
-            Ok(Path::Dir(DirPath(p)))
+    pub fn parse<P: Into<path::PathBuf>>(p: P) -> Result<Path, path::PathBuf> {
+        let path = p.into();
+        if path.is_file() {
+            Ok(Path::File(FilePath(path)))
+        } else if path.is_dir() {
+            Ok(Path::Dir(DirPath(path)))
         } else {
-            Err(p)
+            Err(path)
         }
     }
 
@@ -82,6 +83,16 @@ impl Path {
             Self::Dir(d) => Some(d),
             _ => None,
         }
+    }
+
+    pub fn ext(&self) -> Option<&str> {
+        let path = AsRef::<path::Path>::as_ref(self);
+        path.extension().map(|ext| ext.to_str()).flatten()
+    }
+
+    pub fn parent(&self) -> Option<&str> {
+        let path = AsRef::<path::Path>::as_ref(self);
+        path.parent().map(|s| s.to_str()).flatten()
     }
 }
 
@@ -155,9 +166,7 @@ impl std::error::Error for PathError {}
 
 impl From<path::PathBuf> for Path {
     fn from(value: path::PathBuf) -> Self {
-        Path::impose(value)
-            .map_err(|e| PathError::Unsupported(e))
-            .unwrap()
+        Self::parse(value).unwrap()
     }
 }
 
@@ -211,8 +220,7 @@ impl BreadthFirstWalker {
                     Err(_) => continue,
                     Ok(e) => e,
                 };
-
-                match Path::impose(entry.path()) {
+                match Path::parse(entry.path()) {
                     Ok(p) => match p {
                         Path::File(f) => self.files.push(f),
                         Path::Dir(d) => self.dirs.push(d),

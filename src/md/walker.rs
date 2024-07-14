@@ -3,7 +3,11 @@ use markdown::mdast;
 use super::Error;
 
 use crate::{
-    content::{self, doctree, Metadata},
+    content::{
+        self,
+        doctree::{self, Href},
+        Metadata,
+    },
     md::frontmatter::frontmatter_to_page_meta,
 };
 
@@ -65,7 +69,7 @@ impl<'p> MarkdownPageBuilder<'p> {
     }
 
     fn push_href(&mut self, id: String, href: String) {
-        let href = doctree::HrefDefinition::create(id.clone(), href);
+        let href = doctree::HrefDefinition::create(id.clone(), doctree::Href::Unparsed(href));
         self.builder.hrefs(move |notes| notes.define(&id, href));
     }
 

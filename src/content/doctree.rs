@@ -1,4 +1,79 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    mem,
+};
+
+use url::Url;
+
+use crate::files;
+
+#[derive(Debug)]
+pub enum Href {
+    Unparsed(String),
+    Url(Url),
+    LocalFile(files::Path),
+}
+
+impl Href {
+    pub fn unparsed<S: Into<String>>(unparsed: S) -> Self {
+        Href::Unparsed(unparsed.into())
+    }
+    pub fn parse<'a>(unparsed: &'a str) -> crate::Result<Href> {
+        if let Ok(p) = files::Path::parse(unparsed) {
+            return Ok(Href::LocalFile(p));
+        }
+
+        if let Ok(url) = url::Url::parse(&unparsed) {
+            return Ok(Href::Url(url));
+        }
+
+        Err(Box::new(HrefError::Unsupported(unparsed.to_owned())))
+    }
+
+    pub fn exchange(&mut self, other: &mut Self) {
+        mem::swap(self, other);
+    }
+
+    pub fn is_local_file(&self) -> bool {
+        match self {
+            Href::LocalFile(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_url(&self) -> bool {
+        match self {
+            Href::Url(_) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Display for Href {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Href::Url(url) => write!(f, "{url}"),
+            Href::LocalFile(path) => write!(f, "{path}"),
+            Href::Unparsed(raw) => write!(f, "{raw}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum HrefError {
+    Unsupported(String),
+}
+
+impl Display for HrefError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HrefError::")?;
+        match self {
+            HrefError::Unsupported(href) => write!(f, "Unsupported({href})"),
+        }
+    }
+}
+
+impl std::error::Error for HrefError {}
 
 #[derive(Debug)]
 pub enum Element {
@@ -218,16 +293,19 @@ pub struct Link {
 
 #[derive(Debug)]
 pub struct HrefDefinition {
-    id: String,
-    href_: String,
+    label: String,
+    href_: Href,
 }
 
 impl HrefDefinition {
-    pub fn create(id: String, href: String) -> Self {
-        Self { id, href_: href }
+    pub fn create<H: Into<Href>>(label: String, href: H) -> Self {
+        Self {
+            label,
+            href_: href.into(),
+        }
     }
 
-    pub fn href(&self) -> &String {
+    pub fn href(&self) -> &Href {
         &self.href_
     }
 }
@@ -250,20 +328,17 @@ impl HrefReference {
 }
 
 #[derive(Debug)]
-pub struct Image {
-    alt: String,
-    href: String,
-}
-
-#[derive(Debug)]
 pub struct ImageReference {
-    href: String,
+    href_label: String,
     alt: String,
 }
 
 impl ImageReference {
     pub fn create(href: String, alt: String) -> ImageReference {
-        Self { href, alt }
+        Self {
+            href_label: href,
+            alt,
+        }
     }
 }
 
@@ -343,14 +418,14 @@ impl From<FootnoteReference> for Element {
 
 #[derive(Debug)]
 pub struct FootnoteDefinition {
-    id: String,
+    label: String,
     content: Group,
 }
 
 impl FootnoteDefinition {
     pub fn create<G: Into<Group>>(id: String, content: G) -> Self {
         Self {
-            id,
+            label: id,
             content: content.into(),
         }
     }
@@ -367,12 +442,12 @@ pub trait Definition {
 
 impl Definition for FootnoteDefinition {
     fn label(&self) -> String {
-        self.id.clone()
+        self.label.clone()
     }
 }
 impl Definition for HrefDefinition {
     fn label(&self) -> String {
-        self.id.clone()
+        self.label.clone()
     }
 }
 
@@ -388,7 +463,7 @@ impl Reference for &HrefReference {
 
 impl Reference for &ImageReference {
     fn label(&self) -> &String {
-        &self.href
+        &self.href_label
     }
 }
 

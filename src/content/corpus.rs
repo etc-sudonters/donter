@@ -61,6 +61,10 @@ impl Corpus {
         self.corpus.values()
     }
 
+    pub fn entries_mut(&mut self) -> impl Iterator<Item = &mut CorpusEntry> {
+        self.corpus.values_mut()
+    }
+
     pub fn pages(&self) -> impl Iterator<Item = &Page> {
         self.entries().filter_map(|entry| match entry {
             CorpusEntry::Page(p) => Some(p),

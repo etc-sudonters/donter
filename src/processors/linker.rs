@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use url::Url;
 
-use crate::{files, site};
+use crate::{
+    content::{self, doctree::Href},
+    files, site,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArticleSlugStyle {
@@ -25,6 +28,12 @@ pub struct Linker<'a> {
 impl<'a> site::Processor for Linker<'a> {
     fn page_load(&mut self, page: &mut crate::content::PageBuilder) -> crate::Result<()> {
         page.url_or(self.slug(page));
+        self.entries
+            .insert(page.filepath.clone(), page.url_path.clone().unwrap());
+        Ok(())
+    }
+
+    fn process(&mut self, corpus: &mut crate::content::Corpus) -> crate::Result<()> {
         Ok(())
     }
 }
