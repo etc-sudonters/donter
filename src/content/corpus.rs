@@ -1,10 +1,8 @@
 use super::page::Page;
 use super::PageBuilder;
-use super::PageContents;
-use super::PageMetadata;
 use crate::files;
 use crate::ids;
-use std::{borrow::Borrow, collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
 pub struct Corpus {
@@ -18,7 +16,7 @@ pub enum CorpusEntry {
     StaticAsset(IncludedPath),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IncludedPath(files::Path);
 
 impl From<&IncludedPath> for files::Path {
@@ -27,6 +25,19 @@ impl From<&IncludedPath> for files::Path {
     }
 }
 
+impl From<files::FilePath> for IncludedPath {
+    fn from(value: files::FilePath) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<files::DirPath> for IncludedPath {
+    fn from(value: files::DirPath) -> Self {
+        Self(value.into())
+    }
+}
+
+#[allow(unused)]
 impl Corpus {
     pub fn create(nonce: u64) -> Self {
         Self {

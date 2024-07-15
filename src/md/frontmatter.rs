@@ -1,12 +1,9 @@
 use std::{collections::HashMap, fmt::Display};
 
 use markdown::mdast;
-use yaml_rust2::{self as yaml, yaml::Hash, Yaml, YamlLoader};
+use yaml_rust2::{yaml::Hash, Yaml, YamlLoader};
 
-use crate::{
-    content::{self, Metadata, PageBuilder, PageStatus},
-    files,
-};
+use crate::content::{Metadata, PageBuilder};
 
 #[derive(Debug)]
 pub struct GenericError(String);
@@ -28,8 +25,6 @@ impl Display for GenericError {
 pub fn frontmatter_to_page_meta(y: &mdast::Yaml, b: &mut PageBuilder) -> crate::Result<()> {
     let docs = YamlLoader::load_from_str(&y.value)
         .map_err(|e| GenericError::with_reason(e, format!("on page {}", b.filepath)))?;
-    let metadoc = &docs[0];
-
     b.meta = match &docs[0] {
         Yaml::Hash(map) => convert_yaml_map(map)?
             .into_iter()
@@ -62,21 +57,6 @@ pub fn frontmatter_to_page_meta(y: &mdast::Yaml, b: &mut PageBuilder) -> crate::
             .expect("date key must be provided")?,
     );
 
-    b.status(
-        b.meta
-            .get("status")
-            .map(|s| match s {
-                Metadata::Str(s) => Ok(match s.to_lowercase().as_str() {
-                    "draft" => PageStatus::Draft,
-                    _ => PageStatus::Published,
-                }),
-                _ => Err(super::Error::Unexpected(
-                    "status must be a string".to_owned(),
-                )),
-            })
-            .unwrap_or(Ok(PageStatus::Published))?,
-    );
-
     Ok(())
 }
 
@@ -93,6 +73,7 @@ impl TryFrom<&Yaml> for Metadata {
             )),
             Yaml::String(s) => Ok(Metadata::Str(s.clone())),
             Yaml::Integer(i) => Ok(Metadata::Number(*i as f64)),
+            Yaml::Boolean(b) => Ok(Metadata::Bool(*b)),
             _ => Err(super::Error::Unexpected(
                 "Unsupported yaml in frontmatter".to_owned(),
             ))?,

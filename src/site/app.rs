@@ -1,31 +1,18 @@
+use super::initializer;
 use super::rendered::RenderingSite;
 use super::IncludedAsset;
-use super::RenderedSite;
-use super::RenderingPage;
-use std::borrow::BorrowMut;
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
-
-use super::RenderedPageMetadata;
-
-use super::RenderedPage;
-
-use super::initializer::Initializer;
-
-use super::Processor;
-
 use super::Loader;
-
-use super::initializer;
-
+use super::Processor;
+use super::RenderedPageMetadata;
+use super::RenderedSite;
 use crate::content;
 use crate::files;
-use crate::files::Path;
 use crate::jinja;
 use crate::render::render_page;
 use crate::render::render_summary;
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct AppConfig {
     asset_base: files::DirPath,
@@ -114,7 +101,6 @@ impl<'env> App<'env> {
             origin: Some(page.id.clone()),
             title: Cow::Borrowed(&page.meta.title),
             url: Cow::Owned(self.linker.slug(&page.meta.origin)),
-            when: page.meta.when.as_deref().map(Cow::Borrowed),
             summary: page.meta.summary.as_ref().map(|summ| {
                 render_summary(
                     summ.children(),

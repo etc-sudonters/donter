@@ -70,30 +70,6 @@ impl Path {
             Err(path)
         }
     }
-
-    pub fn as_file(self) -> Option<FilePath> {
-        match self {
-            Self::File(f) => Some(f),
-            _ => None,
-        }
-    }
-
-    pub fn as_dir(self) -> Option<DirPath> {
-        match self {
-            Self::Dir(d) => Some(d),
-            _ => None,
-        }
-    }
-
-    pub fn ext(&self) -> Option<&str> {
-        let path = AsRef::<path::Path>::as_ref(self);
-        path.extension().map(|ext| ext.to_str()).flatten()
-    }
-
-    pub fn parent(&self) -> Option<&str> {
-        let path = AsRef::<path::Path>::as_ref(self);
-        path.parent().map(|s| s.to_str()).flatten()
-    }
 }
 
 impl From<FilePath> for Path {

@@ -1,43 +1,31 @@
+use std::marker::PhantomData;
+
 use crate::{
     content::doctree::Element,
-    site::{self, RenderingPage},
+    site::{self, PageTemplate, RenderingPage},
 };
 
-pub struct TableOfContents;
+pub struct Toc {
+    pub(crate) depth: u8,
+}
 
-impl site::Processor for TableOfContents {
+impl site::Processor for Toc {
     fn page_rendering<'render, 'site>(
         &self,
-        page: &crate::content::Page,
-        rendering: &mut RenderingPage<'render, 'site>,
+        _: &crate::content::Page,
+        _: &mut RenderingPage<'render, 'site>,
     ) -> crate::Result<()>
     where
         'site: 'render,
     {
-        todo!()
+        Ok(())
     }
 }
 
-impl TableOfContents {
-    fn extract<'a>(page: &'a crate::content::PageContents) -> Vec<Heading<'a>> {
-        let mut heads = Vec::new();
+impl Toc {}
 
-        for elm in page.content.iter() {
-            if let Element::Heading(h) = elm {
-                heads.push(Heading {
-                    depth: h.depth(),
-                    id: h.label(),
-                    display: todo!(),
-                });
-            }
-        }
-
-        heads
-    }
-}
-
-struct Heading<'a> {
+struct Heading<'render> {
     depth: u8,
-    display: &'a str,
-    id: &'a str,
+    display: &'render str,
+    id: &'render str,
 }

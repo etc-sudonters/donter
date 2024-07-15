@@ -1,19 +1,12 @@
-use url::form_urlencoded::Target;
-
 use super::IncludedAsset;
-use super::SiteError;
 use super::Writable;
-use crate::content;
 use crate::content::CorpusEntry;
 use crate::files;
 use crate::ids;
 use crate::jinja;
 use std::borrow::Cow;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::marker::PhantomData;
-use std::ops::DerefMut;
 
 pub struct RenderingSite<'rendering, 'site, 'env>
 where
@@ -130,29 +123,14 @@ pub struct RenderedPageMetadata<'site> {
     pub(crate) origin: Option<ids::Id<CorpusEntry>>,
     pub(crate) title: Cow<'site, str>,
     pub(crate) url: Cow<'site, files::FilePath>,
-    pub(crate) when: Option<Cow<'site, str>>,
     pub(crate) summary: Option<String>,
 }
 
 impl<'a> PageTemplate<'a> {
-    pub fn borrow<'b>(&'b self) -> RenderedPageMetadata<'b>
-    where
-        'a: 'b,
-    {
-        RenderedPageMetadata {
-            title: Cow::Borrowed(&self.title),
-            url: Cow::Borrowed(&self.url),
-            when: None,
-            summary: None,
-            origin: None,
-        }
-    }
-
     pub fn stamp<'b>(&self) -> RenderedPageMetadata<'b> {
         RenderedPageMetadata {
             title: Cow::Owned(self.title.to_owned()),
             url: Cow::Owned(self.url.clone()),
-            when: None,
             summary: None,
             origin: None,
         }

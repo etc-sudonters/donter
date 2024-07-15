@@ -1,5 +1,4 @@
 use crate::jinja;
-use crate::Result;
 
 use super::Loader;
 

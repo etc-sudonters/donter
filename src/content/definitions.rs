@@ -37,19 +37,11 @@ impl<T: doctree::Definition> Definitions<T> {
         entry.or_insert(value);
     }
 
-    pub fn redefine(&mut self, key: String, value: T) {
-        self.defs.insert(key, value);
-    }
-
     pub fn definitions(&self) -> impl Iterator<Item = &T> {
         self.labels.iter().map(|lbl| {
             self.defs
                 .get(lbl)
                 .expect(format!("reference {} was not defined", lbl).as_str())
         })
-    }
-
-    pub fn definitions_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.defs.values_mut()
     }
 }

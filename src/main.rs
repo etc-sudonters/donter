@@ -1,4 +1,3 @@
-#![allow(unused)]
 mod cli;
 mod config;
 mod content;
@@ -15,11 +14,8 @@ use std::borrow::Cow;
 use std::error::Error;
 
 use clap::Parser;
-use content::Origin;
-use files::FilePath;
-use processors::{Archive, DateArchivist, TagArchivist, TagSorting};
+use processors::{Archive, StaticFiles, TagArchivist, TagSorting};
 use site::PageTemplate;
-use site::RenderedPageMetadata;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -32,7 +28,11 @@ fn main() -> Result<()> {
             page_root: conf.rendering.page_root.take(),
             slug_source: site::ArticleSlugSource::Filename,
         })
+        .with(processors::Toc { depth: 3 })
         .with(processors::Tags)
+        .with_when(conf.content.assets.is_some(), || {
+            StaticFiles(conf.content.assets.clone().unwrap().into())
+        })
         .with_when(conf.output.clean, || {
             processors::Cleaner(conf.output.output.clone())
         })

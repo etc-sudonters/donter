@@ -1,5 +1,4 @@
 use clap::Parser;
-use markdown::mdast::Root;
 use url::Url;
 
 use crate::{config, files, site::ArticleSlugStyle};
@@ -21,6 +20,8 @@ pub struct Args {
     write_directories: bool,
     #[arg(long, default_value_t = true)]
     clean: bool,
+    #[arg(long)]
+    assets: Option<std::path::PathBuf>,
 }
 
 impl Args {
@@ -28,6 +29,7 @@ impl Args {
         config::Configuration {
             content: config::Content {
                 base: unsafe { files::DirPath::new(self.content_path) },
+                assets: self.assets.map(|a| unsafe { files::DirPath::new(a) }),
             },
             site: config::Site {
                 templates: unsafe { files::DirPath::new(self.template_path) },

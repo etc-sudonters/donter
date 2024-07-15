@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{files, ids};
+use crate::ids;
 
 use super::{doctree, CorpusEntry, Definitions, Metadata, Origin};
 
@@ -16,16 +16,9 @@ pub struct PageMetadata {
     pub(crate) title: String,
     pub(crate) origin: Origin,
     pub(crate) when: Option<String>,
-    pub(crate) status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,
     pub(crate) summary: Option<doctree::Group>,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum PageStatus {
-    Published,
-    Draft,
 }
 
 #[derive(Debug)]

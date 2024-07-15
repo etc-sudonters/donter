@@ -6,7 +6,7 @@ pub struct Cleaner(pub files::Path);
 impl site::Processor for Cleaner {
     fn initialize<'call, 'init>(
         &'call mut self,
-        site: &'call mut site::Initializer<'init, '_>,
+        _: &'call mut site::Initializer<'init, '_>,
     ) -> crate::Result<()>
     where
         'init: 'call,
@@ -19,7 +19,7 @@ impl site::Processor for Cleaner {
             }
             Dir(d) => {
                 fs::remove_dir_all(d)?;
-                fs::create_dir_all(d);
+                fs::create_dir_all(d)?;
             }
         };
 

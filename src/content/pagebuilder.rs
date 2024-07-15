@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use super::definitions::Definitions;
-use super::page::{Page, PageContents, PageMetadata, PageStatus};
-use super::{doctree, meta};
+use super::doctree;
+use super::page::{Page, PageContents, PageMetadata};
 use super::{CorpusEntry, Metadata};
-use crate::ids::Id;
 use crate::{files, ids};
 
 pub struct PageBuilder {
@@ -15,7 +14,6 @@ pub struct PageBuilder {
     pub(crate) notes: Definitions<doctree::FootnoteDefinition>,
     pub(crate) page_hrefs: Definitions<doctree::HrefDefinition>,
     pub(crate) when: Option<String>,
-    pub(crate) page_status: PageStatus,
     pub(crate) tpl_name: String,
     pub(crate) meta: HashMap<String, Metadata>,
     pub(crate) summary: Option<doctree::Group>,
@@ -31,7 +29,6 @@ impl PageBuilder {
             notes: Default::default(),
             page_hrefs: Default::default(),
             when: Default::default(),
-            page_status: PageStatus::Published,
             tpl_name: "page.html".to_owned(),
             meta: Default::default(),
             summary: Default::default(),
@@ -45,11 +42,6 @@ impl PageBuilder {
 
     pub fn written(&mut self, d: String) -> &mut Self {
         self.when = Some(d);
-        self
-    }
-
-    pub fn status(&mut self, s: PageStatus) -> &mut Self {
-        self.page_status = s;
         self
     }
 
@@ -81,7 +73,6 @@ impl PageBuilder {
                 title: self.title,
                 origin: super::Origin(self.filepath),
                 when: self.when.take(),
-                status: self.page_status,
                 tpl_name: self.tpl_name,
                 meta: self.meta,
                 summary: self.summary,

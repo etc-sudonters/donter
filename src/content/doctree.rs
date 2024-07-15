@@ -1,19 +1,18 @@
-use std::{
-    fmt::{Debug, Display},
-    mem,
-};
+use std::fmt::{Debug, Display};
 
 use url::Url;
 
 use crate::files;
 
 #[derive(Debug)]
+#[allow(unused)]
 pub enum Href {
     Unparsed(String),
     Url(Url),
     LocalFile(files::Path),
 }
 
+#[allow(unused)]
 impl Href {
     pub fn unparsed<S: Into<String>>(unparsed: S) -> Self {
         Href::Unparsed(unparsed.into())
@@ -29,24 +28,6 @@ impl Href {
 
         Err(Box::new(HrefError::Unsupported(unparsed.to_owned())))
     }
-
-    pub fn exchange(&mut self, other: &mut Self) {
-        mem::swap(self, other);
-    }
-
-    pub fn is_local_file(&self) -> bool {
-        match self {
-            Href::LocalFile(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_url(&self) -> bool {
-        match self {
-            Href::Url(_) => true,
-            _ => false,
-        }
-    }
 }
 
 impl Display for Href {
@@ -59,6 +40,7 @@ impl Display for Href {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum HrefError {
     Unsupported(String),
@@ -285,13 +267,6 @@ impl Debug for Text {
 }
 
 #[derive(Debug)]
-pub struct Link {
-    href: String,
-    content: Box<Element>,
-    title: Option<String>,
-}
-
-#[derive(Debug)]
 pub struct HrefDefinition {
     label: String,
     href_: Href,
@@ -313,13 +288,12 @@ impl HrefDefinition {
 #[derive(Debug)]
 pub struct HrefReference {
     content: Group,
-    id: String,
-    title: Option<String>,
+    label: String,
 }
 
 impl HrefReference {
-    pub fn create(id: String, content: Group, title: Option<String>) -> Self {
-        Self { content, id, title }
+    pub fn create(label: String, content: Group) -> Self {
+        Self { content, label }
     }
 
     pub fn children(&self) -> &Group {
@@ -330,6 +304,7 @@ impl HrefReference {
 #[derive(Debug)]
 pub struct ImageReference {
     href_label: String,
+    #[allow(unused)]
     alt: String,
 }
 
@@ -457,7 +432,7 @@ pub trait Reference {
 
 impl Reference for &HrefReference {
     fn label(&self) -> &String {
-        &self.id
+        &self.label
     }
 }
 

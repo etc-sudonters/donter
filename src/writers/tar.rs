@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, io::Write};
+use std::io::Write;
 
 use crate::{files, site};
 

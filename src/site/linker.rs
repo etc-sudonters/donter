@@ -1,10 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 use url::Url;
 
-use crate::{
-    content::{self, doctree::Href},
-    files, ids, site,
-};
+use crate::files;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArticleSlugStyle {

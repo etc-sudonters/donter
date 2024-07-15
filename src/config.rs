@@ -1,7 +1,6 @@
 use url::Url;
 
-use crate::{files, processors};
-use crate::{site, writers};
+use crate::{files, site, writers};
 use std::fs;
 
 #[derive(Clone, Debug)]
@@ -15,6 +14,7 @@ pub struct Configuration {
 #[derive(Clone, Debug)]
 pub struct Content {
     pub(crate) base: files::DirPath,
+    pub(crate) assets: Option<files::DirPath>,
 }
 impl Content {
     pub fn base(&self) -> files::DirPath {

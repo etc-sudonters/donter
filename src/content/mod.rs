@@ -10,7 +10,7 @@ pub use corpus::{Corpus, CorpusEntry, IncludedPath};
 pub use definitions::Definitions;
 pub use meta::Metadata;
 pub use origin::Origin;
-pub use page::{Page, PageContents, PageMetadata, PageStatus};
+pub use page::{Page, PageContents};
 pub use pagebuilder::PageBuilder;
 
 #[derive(Debug)]

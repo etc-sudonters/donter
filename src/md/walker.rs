@@ -3,11 +3,7 @@ use markdown::mdast;
 use super::Error;
 
 use crate::{
-    content::{
-        self,
-        doctree::{self, Href},
-        Metadata,
-    },
+    content::{self, doctree, Metadata},
     md::frontmatter::frontmatter_to_page_meta,
 };
 
@@ -221,7 +217,7 @@ impl<'p> MarkdownPageBuilder<'p> {
         let label = get_hex_hash_string(&link.url);
         let content = self.collect_children(&link.children)?;
         self.push_element(doctree::Element::HrefReference(
-            doctree::HrefReference::create(label.clone(), content.into(), link.title.clone()),
+            doctree::HrefReference::create(label.clone(), content.into()),
         ));
         self.push_href(label.clone(), link.url.clone());
         Ok(())
@@ -232,7 +228,7 @@ impl<'p> MarkdownPageBuilder<'p> {
             .hrefs(|hrefs| hrefs.add_label(&link.identifier));
         let content = self.collect_children(&link.children)?;
         self.push_element(doctree::Element::HrefReference(
-            doctree::HrefReference::create(link.identifier.clone(), content.into(), None),
+            doctree::HrefReference::create(link.identifier.clone(), content.into()),
         ));
         Ok(())
     }

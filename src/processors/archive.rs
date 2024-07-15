@@ -80,7 +80,6 @@ impl<'a> From<&'a site::RenderedPage<'a>> for ArchiveEntry<'a> {
 pub struct DateArchivist<'a>(pub &'a str);
 pub enum TagSorting {
     Alphabetical,
-    Popularity,
 }
 pub struct TagArchivist(pub TagSorting);
 
@@ -167,7 +166,7 @@ where
 
     fn site_rendering<'site>(
         &self,
-        corpus: &'site content::Corpus,
+        _: &'site content::Corpus,
         site: &mut site::RenderingSite<'_, 'site, '_>,
     ) -> crate::Result<()> {
         let mut page = site.page(&self.template.template);

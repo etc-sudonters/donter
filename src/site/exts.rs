@@ -9,8 +9,6 @@ use crate::content;
 use crate::files;
 use crate::jinja;
 
-use initializer::Initializer;
-
 use crate::Result;
 
 pub trait Loader {
