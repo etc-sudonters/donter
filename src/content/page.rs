@@ -15,7 +15,6 @@ pub struct Page {
 pub struct PageMetadata {
     pub(crate) title: String,
     pub(crate) origin: Origin,
-    pub(crate) url: files::FilePath,
     pub(crate) when: Option<String>,
     pub(crate) status: PageStatus,
     pub(crate) tpl_name: String,

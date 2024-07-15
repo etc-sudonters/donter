@@ -6,7 +6,7 @@ use crate::{
 pub struct StaticFiles(Vec<IncludedPath>);
 
 impl site::Processor for StaticFiles {
-    fn site_render<'site>(
+    fn site_rendering<'site>(
         &self,
         corpus: &'site content::Corpus,
         site: &mut site::rendered::RenderingSite<'_, 'site, '_>,

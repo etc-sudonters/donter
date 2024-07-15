@@ -9,6 +9,7 @@ pub struct Configuration {
     pub(crate) content: Content,
     pub(crate) site: Site,
     pub(crate) output: Output,
+    pub(crate) rendering: Rendering,
 }
 
 #[derive(Clone, Debug)]
@@ -28,10 +29,14 @@ pub struct Site {
 }
 
 #[derive(Clone, Debug)]
+pub struct Rendering {
+    pub(crate) slug_style: site::ArticleSlugStyle,
+    pub(crate) page_root: Option<files::DirPath>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Output {
     pub(crate) output: files::Path,
-    pub(crate) slug_style: processors::ArticleSlugStyle,
-    pub(crate) article_prefix: Option<String>,
     pub(crate) clean: bool,
 }
 

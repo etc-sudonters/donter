@@ -12,7 +12,6 @@ pub struct PageBuilder {
     pub(crate) title: String,
     pub(crate) contents: Vec<doctree::Element>,
     pub(crate) filepath: files::FilePath,
-    pub(crate) url_path: Option<files::FilePath>,
     pub(crate) notes: Definitions<doctree::FootnoteDefinition>,
     pub(crate) page_hrefs: Definitions<doctree::HrefDefinition>,
     pub(crate) when: Option<String>,
@@ -29,7 +28,6 @@ impl PageBuilder {
             filepath: f.into(),
             title: Default::default(),
             contents: Default::default(),
-            url_path: Default::default(),
             notes: Default::default(),
             page_hrefs: Default::default(),
             when: Default::default(),
@@ -60,18 +58,6 @@ impl PageBuilder {
         self
     }
 
-    pub fn url(&mut self, d: files::FilePath) -> &mut Self {
-        self.url_path = Some(d);
-        self
-    }
-
-    pub fn url_or(&mut self, d: files::FilePath) -> &mut Self {
-        if self.url_path.is_none() {
-            self.url_path = Some(d);
-        }
-        self
-    }
-
     pub fn footnotes<F>(&mut self, f: F) -> &mut Self
     where
         F: FnOnce(&mut Definitions<doctree::FootnoteDefinition>),
@@ -94,7 +80,6 @@ impl PageBuilder {
             meta: PageMetadata {
                 title: self.title,
                 origin: super::Origin(self.filepath),
-                url: self.url_path.unwrap(),
                 when: self.when.take(),
                 status: self.page_status,
                 tpl_name: self.tpl_name,

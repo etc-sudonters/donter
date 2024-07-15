@@ -157,7 +157,7 @@ impl<'archive, A> site::Processor for Archive<'archive, A>
 where
     A: Archivist,
 {
-    fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
+    fn site_loaded(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
         for page in corpus.pages() {
             self.archivist.archive_page(page, &mut self.buckets)?
         }
@@ -165,7 +165,7 @@ where
         Ok(())
     }
 
-    fn site_render<'site>(
+    fn site_rendering<'site>(
         &self,
         corpus: &'site content::Corpus,
         site: &mut site::RenderingSite<'_, 'site, '_>,

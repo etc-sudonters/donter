@@ -1,7 +1,8 @@
 use clap::Parser;
+use markdown::mdast::Root;
 use url::Url;
 
-use crate::{config, files, processors::ArticleSlugStyle};
+use crate::{config, files, site::ArticleSlugStyle};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -14,8 +15,8 @@ pub struct Args {
     url_base: String,
     #[arg(short = 'T', value_name = "TEMPLATES")]
     template_path: std::path::PathBuf,
-    #[arg(short = 'P', value_name = "PATH")]
-    article_prefix: Option<String>,
+    #[arg(short = 'P', value_name = "PAGE_ROOT_PATH")]
+    page_root: Option<String>,
     #[arg(short = 'D', default_value_t = false)]
     write_directories: bool,
     #[arg(long, default_value_t = true)]
@@ -39,13 +40,18 @@ impl Args {
                     }
                     _ => files::Path::Dir(unsafe { files::DirPath::new(self.output) }),
                 },
+                clean: self.clean,
+            },
+            rendering: config::Rendering {
                 slug_style: if self.write_directories {
                     ArticleSlugStyle::Directory
                 } else {
                     ArticleSlugStyle::Page
                 },
-                article_prefix: self.article_prefix.take(),
-                clean: self.clean,
+                page_root: self
+                    .page_root
+                    .take()
+                    .map(|root| unsafe { files::DirPath::new(root) }),
             },
         }
     }

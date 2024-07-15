@@ -6,7 +6,7 @@ use crate::{
 pub struct TableOfContents;
 
 impl site::Processor for TableOfContents {
-    fn page_render<'render, 'site>(
+    fn page_rendering<'render, 'site>(
         &self,
         page: &crate::content::Page,
         rendering: &mut RenderingPage<'render, 'site>,

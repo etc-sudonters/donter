@@ -11,6 +11,7 @@ mod render;
 mod site;
 mod writers;
 
+use std::borrow::Cow;
 use std::error::Error;
 
 use clap::Parser;
@@ -25,12 +26,12 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 fn main() -> Result<()> {
     let mut conf = cli::Args::parse().make_config();
     let mut app = site::Builder::new()
-        .with(processors::Linker::new(processors::LinkerOptions {
-            content_base: &conf.content.base,
-            site_base: &conf.site.base_url,
-            slug_style: conf.output.slug_style,
-            article_prefix: conf.output.article_prefix.take(),
-        }))
+        .linker(site::LinkerOptions {
+            site_base: Cow::Borrowed(&conf.site.base_url),
+            slug_style: conf.rendering.slug_style,
+            page_root: conf.rendering.page_root.take(),
+            slug_source: site::ArticleSlugSource::Filename,
+        })
         .with(processors::Tags)
         .with_when(conf.output.clean, || {
             processors::Cleaner(conf.output.output.clone())

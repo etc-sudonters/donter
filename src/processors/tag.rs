@@ -9,7 +9,7 @@ use crate::{
 pub struct Tags;
 
 impl site::Processor for Tags {
-    fn page_render<'render, 'site>(
+    fn page_rendering<'render, 'site>(
         &self,
         page: &content::Page,
         rendering: &mut RenderingPage<'render, 'site>,

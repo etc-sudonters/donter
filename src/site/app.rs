@@ -22,6 +22,7 @@ use super::initializer;
 
 use crate::content;
 use crate::files;
+use crate::files::Path;
 use crate::jinja;
 use crate::render::render_page;
 use crate::render::render_summary;
@@ -35,10 +36,11 @@ pub struct App<'a> {
     processors: Vec<Box<dyn Processor + 'a>>,
     renderer: Rc<RefCell<minijinja::Environment<'a>>>,
     config: AppConfig,
+    linker: super::Linker<'a>,
 }
 
 impl<'env> App<'env> {
-    pub fn create(mut processors: Vec<Box<dyn Processor + 'env>>) -> crate::Result<App<'env>> {
+    pub fn create(mut site: super::Builder<'env>) -> crate::Result<App<'env>> {
         let mut renderer = minijinja::Environment::new();
         let mut loaders = Default::default();
 
@@ -48,13 +50,14 @@ impl<'env> App<'env> {
                 loaders: &mut loaders,
             };
 
-            for processor in processors.iter_mut() {
+            for processor in site.processors.iter_mut() {
                 processor.initialize(&mut builder)?;
             }
         }
 
         Ok(App {
-            processors,
+            linker: super::Linker::new(site.linker_opts),
+            processors: site.processors,
             loaders,
             renderer: Rc::new(RefCell::new(renderer)),
             config: AppConfig {
@@ -74,7 +77,7 @@ impl<'env> App<'env> {
                     let mut builder = corpus.make_page(path.clone());
                     loader.load(Box::new(std::fs::File::open(&path)?), &mut builder)?;
                     for processor in self.processors.iter_mut() {
-                        processor.page_load(&mut builder)?;
+                        processor.page_loading(&mut builder)?;
                     }
                     corpus.add_page(builder)?;
                     break;
@@ -104,13 +107,13 @@ impl<'env> App<'env> {
         });
 
         for processor in self.processors.iter() {
-            processor.page_render(page, &mut rendering)?;
+            processor.page_rendering(page, &mut rendering)?;
         }
 
         let meta = RenderedPageMetadata {
             origin: Some(page.id.clone()),
             title: Cow::Borrowed(&page.meta.title),
-            url: Cow::Borrowed(&page.meta.url),
+            url: Cow::Owned(self.linker.slug(&page.meta.origin)),
             when: page.meta.when.as_deref().map(Cow::Borrowed),
             summary: page.meta.summary.as_ref().map(|summ| {
                 render_summary(
@@ -128,7 +131,7 @@ impl<'env> App<'env> {
 
     pub fn process(&mut self, corpus: &mut content::Corpus) -> crate::Result<()> {
         for processor in self.processors.iter_mut() {
-            processor.process(corpus)?;
+            processor.site_loaded(corpus)?;
         }
 
         Ok(())
@@ -163,7 +166,7 @@ impl<'env> App<'env> {
         }
 
         for processor in self.processors.iter() {
-            processor.site_render(&corpus, &mut site)?;
+            processor.site_rendering(&corpus, &mut site)?;
         }
 
         Ok(site.render())

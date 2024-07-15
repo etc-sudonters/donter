@@ -23,6 +23,7 @@ pub trait Loader {
 }
 
 pub trait Processor {
+    // called as part of initializing the application
     fn initialize<'call, 'init>(
         &'call mut self,
         site: &'call mut initializer::Initializer<'init, '_>,
@@ -33,19 +34,27 @@ pub trait Processor {
         Ok(())
     }
 
-    fn page_load(&mut self, page: &mut content::PageBuilder) -> Result<()> {
+    // called after a page has been proccessed from source but before it is placed into the corpus
+    fn page_loading(&mut self, page: &mut content::PageBuilder) -> Result<()> {
         Ok(())
     }
 
-    fn process(&mut self, corpus: &mut content::Corpus) -> Result<()> {
+    // all pages have been loaded into the corpus
+    fn site_loaded(&mut self, corpus: &mut content::Corpus) -> Result<()> {
         Ok(())
     }
 
-    fn global_render_context(&self, ctx: &mut jinja::RenderContext) -> Result<()> {
+    // called once before any rendering happens, the context is placed under "globals" and
+    // available to all page renderings
+    fn global_render_context<'site>(
+        &'site self,
+        ctx: &'site mut jinja::RenderContext,
+    ) -> Result<()> {
         Ok(())
     }
 
-    fn page_render<'render, 'site>(
+    // called before the specific page is rendered
+    fn page_rendering<'render, 'site>(
         &self,
         page: &'site content::Page,
         rendering: &mut RenderingPage<'render, 'site>,
@@ -56,7 +65,8 @@ pub trait Processor {
         Ok(())
     }
 
-    fn site_render<'site>(
+    // called after all pages have been rendered
+    fn site_rendering<'site>(
         &self,
         corpus: &'site content::Corpus,
         site: &mut RenderingSite<'_, 'site, '_>,
@@ -64,6 +74,7 @@ pub trait Processor {
         Ok(())
     }
 
+    // called to drop/reset any state accumulated
     fn finalize(&mut self) -> Result<()> {
         Ok(())
     }
